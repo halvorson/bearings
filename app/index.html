@@ -7,6 +7,22 @@
     <meta name="theme-color" content="#1e40af" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Bearings</title>
+    <script>
+      // GA4 — conditional on VITE_GA_ID being set at build time
+      (function() {
+        var id = '%VITE_GA_ID%';
+        if (!id || id.indexOf('VITE_GA_ID') !== -1) return;
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://www.googletagmanager.com/gtag/js?id=' + id;
+        document.head.appendChild(s);
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){ dataLayer.push(arguments); }
+        window.gtag = gtag;
+        gtag('js', new Date());
+        gtag('config', id);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
