@@ -41,6 +41,15 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: false
+    sourcemap: false,
+    chunkSizeWarningLimit: 1800,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          mapbox: ['mapbox-gl'],
+          firebase: ['firebase/app', 'firebase/firestore'],
+        },
+      },
+    },
   }
 });

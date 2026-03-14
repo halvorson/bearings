@@ -82,7 +82,7 @@ export default function CaptureOverlay({ sessionId }) {
       aria-label="Record bearing"
     >
       {/* Top bar — GPS status */}
-      <div className="flex items-center justify-between px-4 pt-safe pt-4 pb-3 border-b border-gray-700">
+      <div className="flex items-center justify-between px-4 pt-safe-t pt-4 pb-3 border-b border-gray-700">
         <GpsStatus accuracy={accuracy} error={gpsError} />
       </div>
 
@@ -113,7 +113,7 @@ export default function CaptureOverlay({ sessionId }) {
       </div>
 
       {/* Bottom — Confirm + Cancel */}
-      <div className="flex flex-col gap-3 px-4 pb-safe pb-6 pt-3 border-t border-gray-700">
+      <div className="flex flex-col gap-3 px-4 pb-safe-b pb-6 pt-3 border-t border-gray-700">
         <button
           type="button"
           onClick={handleConfirm}

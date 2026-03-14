@@ -52,7 +52,7 @@ export default function TrackButton({ sessionId }) {
   };
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 max-w-lg mx-auto z-20">
+    <div className="fixed bottom-4 pb-safe-b left-4 right-4 max-w-lg mx-auto z-20">
       <button
         type="button"
         onClick={handlePress}

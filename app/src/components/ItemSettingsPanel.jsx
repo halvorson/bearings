@@ -90,7 +90,7 @@ export default function ItemSettingsPanel({
         aria-modal="true"
         aria-label="Item settings"
         className="fixed bottom-0 left-0 right-0 z-30 bg-white rounded-t-2xl
-                   shadow-2xl p-4 pb-8 flex flex-col gap-5"
+                   shadow-2xl p-4 pb-8 pb-safe-b flex flex-col gap-5"
       >
         {/* Header row */}
         <div className="flex items-center justify-between">
