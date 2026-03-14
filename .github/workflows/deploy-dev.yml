@@ -20,7 +20,7 @@ jobs:
       - name: Install functions deps
         working-directory: functions
         run: npm ci
-      - uses: w9jds/firebase-action@v13
+      - uses: w9jds/firebase-action@v13.35.1
         with:
           args: deploy --only hosting,functions,firestore:rules,firestore:indexes --project dev
         env:
