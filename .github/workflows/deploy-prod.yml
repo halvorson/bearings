@@ -1,0 +1,28 @@
+name: Deploy — Prod
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install & build frontend
+        working-directory: app
+        run: npm ci && npm run build
+        env:
+          VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG_PROD }}
+          VITE_MAPBOX_TOKEN: ${{ secrets.VITE_MAPBOX_TOKEN_PROD }}
+          VITE_GA_ID: ${{ secrets.VITE_GA_MEASUREMENT_ID_PROD }}
+      - name: Install functions deps
+        working-directory: functions
+        run: npm ci
+      - uses: w9jds/firebase-action@v13
+        with:
+          args: deploy --only hosting,functions,firestore:rules,firestore:indexes --project prod
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PROD }}

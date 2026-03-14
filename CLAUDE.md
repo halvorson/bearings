@@ -39,6 +39,16 @@ Collaborative GPS + compass triangulation PWA. No auth — sessions shared via U
 - Firebase config is base64-encoded valid JSON (double-quoted keys)
 - GA4 events tracked via `src/lib/analytics.js` `track()` wrapper
 
+## Bash Permissions Policy
+Use dedicated tools (Read, Edit, Write, Glob, Grep) instead of shell equivalents (`cat`, `head`, `sed`, `grep`, `find`, etc.). The allowlist in `.claude/settings.local.json` is intentionally minimal:
+- **Build/run:** `node`, `npm`, `npx`, `firebase`
+- **Version control:** `git`, `gh`
+- **Network:** `curl`
+- **Filesystem:** `ls`, `mkdir`, `cp`, `mv`, `which`, `pwd`
+- **Process management:** `kill`, `lsof` (for stopping emulators)
+
+Do not add commands to the allowlist for one-off tasks — accept the permission prompt instead. Only add commands that are needed repeatedly across sessions.
+
 ## Development Workflow
 - Opus coordinates, Sonnet writes code, Haiku does reviews and lightweight tasks
 - Every phase ends with a checkpoint PR

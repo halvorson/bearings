@@ -1,0 +1,25 @@
+{
+  "name": "bearings-functions",
+  "private": true,
+  "version": "0.1.0",
+  "main": "src/index.js",
+  "engines": {
+    "node": "20"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0",
+    "firebase-functions": "^7.1.1"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.8"
+  }
+}

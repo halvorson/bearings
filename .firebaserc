@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "dev":     "bearings-app-dev",
+    "default": "bearings-app-dev",
+    "prod":    "bearings-app-prod"
+  }
+}

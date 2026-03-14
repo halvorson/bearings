@@ -1,0 +1,51 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isValidBearing(b) {
+      return b is number && b >= 0 && b <= 360;
+    }
+    function isValidLat(l) {
+      return l is number && l >= -90 && l <= 90;
+    }
+    function isValidLng(l) {
+      return l is number && l >= -180 && l <= 180;
+    }
+
+    match /sessions/{sessionId} {
+      allow read: if true;
+      allow create: if request.resource.data.keys()
+        .hasAll(['id','name','itemCount','createdAt']);
+      allow update: if request.resource.data.diff(
+        resource.data).affectedKeys().hasOnly(['name', 'itemCount']);
+
+      match /items/{itemId} {
+        allow read: if true;
+        allow create: if request.resource.data.keys()
+          .hasAll(['name','locked','itemIndex','createdAt'])
+          && request.resource.data.locked == false;
+        allow update: if request.resource.data.diff(
+          resource.data).affectedKeys().hasOnly(['name','locked']);
+
+        match /dataPoints/{pointId} {
+          allow read: if true;
+          allow create: if
+            get(/databases/$(database)/documents/sessions/$(sessionId)
+              /items/$(itemId)).data.locked == false
+            && request.resource.data.keys().hasAll([
+                 'participantToken','lat','lng',
+                 'bearing','accuracy','timestamp'])
+            && isValidBearing(request.resource.data.bearing)
+            && isValidLat(request.resource.data.lat)
+            && isValidLng(request.resource.data.lng);
+          allow delete: if true; // v1: token match enforced client-side only
+        }
+
+        match /triangulation/{doc} {
+          allow read: if true;
+          allow write: if false; // Function uses Admin SDK, bypasses rules
+        }
+      }
+    }
+  }
+}
