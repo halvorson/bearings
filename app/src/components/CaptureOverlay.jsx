@@ -31,6 +31,8 @@ export default function CaptureOverlay({ sessionId }) {
 
   if (!captureOverlayOpen) return null;
 
+  // This overlay is now only used for manual bearing input (no compass).
+
   // Determine the effective bearing to record
   const effectiveBearing = compassSupported ? bearing : manualBearing;
 

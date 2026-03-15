@@ -214,18 +214,12 @@ describe('TrackButton', () => {
     expect(button).toHaveTextContent('Track');
   });
 
-  it('shows "GPS required" when GPS has error', async () => {
-    const { useGeolocation } = await import('../hooks/useGeolocation');
-    useGeolocation.mockReturnValue({
-      lat: null, lng: null, accuracy: null, error: 'Location denied',
-    });
-
+  it('shows "Track" when GPS is not yet acquired (permission deferred)', async () => {
+    // TrackButton no longer checks GPS — location permission is deferred
+    // until CaptureOverlay opens, so button should always say "Track"
     render(<TrackButton sessionId="test" />);
-    expect(screen.getByText('GPS required')).toBeInTheDocument();
-    expect(screen.getByRole('button')).toBeDisabled();
-
-    // Restore
-    useGeolocation.mockReturnValue({ lat: 51.5, lng: -0.1, accuracy: 10, error: null });
+    expect(screen.getByText('Track')).toBeInTheDocument();
+    expect(screen.getByRole('button')).not.toBeDisabled();
   });
 
   it('shows "Locked" when item is locked', async () => {

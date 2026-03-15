@@ -4,23 +4,20 @@ import { db } from '../lib/firebase';
 import { track } from '../lib/analytics';
 
 /**
- * Top bar showing the session name (inline editable) and a share button.
- * Positioned absolute so the map / content underneath can fill the full viewport.
+ * Compact session header for the instrument panel — dark themed.
+ * Shows the session name (inline editable) and a share button.
  */
 export default function SessionHeader({ sessionId, session }) {
   const [editingName, setEditingName] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const inputRef = useRef(null);
 
-  // Keep local editing state in sync when the session name changes remotely,
-  // but only while the user is NOT actively editing.
   useEffect(() => {
     if (!isEditing && session?.name) {
       setEditingName(session.name);
     }
   }, [session?.name, isEditing]);
 
-  // Update document.title whenever session name changes.
   useEffect(() => {
     if (session?.name) {
       document.title = `${session.name} — Bearings`;
@@ -40,7 +37,6 @@ export default function SessionHeader({ sessionId, session }) {
       track('session_renamed');
     } catch (err) {
       console.error('Failed to rename session:', err);
-      // Revert to the last known server value on error.
       setEditingName(session?.name ?? '');
     }
   };
@@ -65,7 +61,6 @@ export default function SessionHeader({ sessionId, session }) {
       }
       track('share_link_copied');
     } catch (err) {
-      // User cancelled share sheet or clipboard blocked — not an error worth surfacing.
       if (err.name !== 'AbortError') {
         console.error('Share failed:', err);
       }
@@ -73,8 +68,7 @@ export default function SessionHeader({ sessionId, session }) {
   };
 
   return (
-    <header className="absolute top-0 left-0 right-0 z-10 bg-white shadow-sm px-4 py-2 flex items-center gap-2">
-      {/* Session name — styled to look like plain text until focused */}
+    <header className="bg-gray-950 px-4 py-1 flex items-center gap-2">
       <input
         ref={inputRef}
         type="text"
@@ -84,22 +78,20 @@ export default function SessionHeader({ sessionId, session }) {
         onBlur={commitName}
         onKeyDown={handleKeyDown}
         aria-label="Session name"
-        className="flex-1 min-w-0 bg-transparent text-gray-900 font-semibold text-base
+        className="flex-1 min-w-0 bg-transparent text-gray-200 font-semibold text-sm
                    leading-tight rounded px-1 py-1 min-h-[44px]
-                   border border-transparent hover:border-gray-200
-                   focus:border-blue-400 focus:outline-none focus:bg-gray-50
+                   border border-transparent hover:border-gray-700
+                   focus:border-amber-500/50 focus:outline-none focus:bg-gray-900
                    transition-colors truncate"
       />
 
-      {/* Share button */}
       <button
         onClick={handleShare}
         aria-label="Share session link"
         className="flex-none flex items-center justify-center w-11 h-11 rounded-full
-                   text-gray-500 hover:text-blue-600 hover:bg-blue-50
-                   active:bg-blue-100 transition-colors"
+                   text-gray-500 hover:text-amber-400 hover:bg-gray-800
+                   active:bg-gray-700 transition-colors"
       >
-        {/* Share / upload icon */}
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 24 24"

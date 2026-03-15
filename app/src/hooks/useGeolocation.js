@@ -1,6 +1,12 @@
 import { useState, useEffect } from 'react';
 
-export function useGeolocation() {
+/**
+ * @param {{ enabled?: boolean }} options
+ *   enabled — when false, no position watching occurs (default true).
+ *   Pass false to defer the location permission prompt until the user
+ *   explicitly initiates tracking.
+ */
+export function useGeolocation({ enabled = true } = {}) {
   const [lat, setLat] = useState(null);
   const [lng, setLng] = useState(null);
   const [accuracy, setAccuracy] = useState(null);
@@ -9,6 +15,7 @@ export function useGeolocation() {
   const supported = typeof navigator !== 'undefined' && 'geolocation' in navigator;
 
   useEffect(() => {
+    if (!enabled) return;
     if (!supported) {
       setError('Location is not available on this device');
       return;
@@ -48,7 +55,7 @@ export function useGeolocation() {
     return () => {
       navigator.geolocation.clearWatch(watchId);
     };
-  }, [supported]);
+  }, [supported, enabled]);
 
   return { lat, lng, accuracy, error, supported };
 }

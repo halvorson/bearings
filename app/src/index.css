@@ -4,11 +4,14 @@
 
 @layer base {
   html, body {
-    @apply h-full;
+    height: 100dvh;
+    overflow: hidden;
+    background: #030712;
   }
 
   #root {
-    @apply h-full;
+    height: 100dvh;
+    overflow: hidden;
   }
 }
 

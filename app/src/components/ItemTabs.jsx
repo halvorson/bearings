@@ -11,8 +11,8 @@ import { track } from '../lib/analytics';
 import useSessionStore from '../store/useSessionStore';
 
 /**
- * Horizontal scrolling tab bar for switching between items and creating new ones.
- * Positioned absolute directly below SessionHeader (~48 px from top).
+ * Horizontal scrolling tab bar for switching between items.
+ * Dark themed for the instrument panel.
  */
 export default function ItemTabs({
   sessionId,
@@ -25,7 +25,6 @@ export default function ItemTabs({
   const creatingRef = useRef(false);
 
   const handleCreateItem = async () => {
-    // Debounce: prevent double-tap from creating two items.
     if (creatingRef.current) return;
     creatingRef.current = true;
 
@@ -45,7 +44,6 @@ export default function ItemTabs({
 
       await batch.commit();
 
-      // Switch to the newly created item.
       setActiveItem(newItemRef.id);
       onSelectItem?.(newItemRef.id);
 
@@ -60,11 +58,8 @@ export default function ItemTabs({
   return (
     <nav
       aria-label="Items"
-      className="absolute left-0 right-0 z-10 bg-white border-b border-gray-200
-                 flex overflow-x-auto"
-      style={{ top: '48px' }}
+      className="bg-gray-900 border-b border-gray-800 flex overflow-x-auto"
     >
-      {/* Suppress scrollbar while preserving scroll functionality */}
       <style>{`
         nav[aria-label="Items"]::-webkit-scrollbar { display: none; }
         nav[aria-label="Items"] { -ms-overflow-style: none; scrollbar-width: none; }
@@ -81,13 +76,13 @@ export default function ItemTabs({
               'flex-none flex items-center gap-1 px-4 whitespace-nowrap min-h-[44px]',
               'text-sm font-medium transition-colors border-b-2',
               isActive
-                ? 'text-blue-600 border-blue-500 bg-blue-50'
-                : 'text-gray-600 border-transparent hover:text-gray-900 hover:bg-gray-50',
+                ? 'text-amber-400 border-amber-500 bg-gray-800/50'
+                : 'text-gray-500 border-transparent hover:text-gray-300 hover:bg-gray-800/30',
             ].join(' ')}
           >
             <span className="truncate max-w-[120px]">{item.name}</span>
             {item.locked && (
-              <span aria-label="locked" className="text-xs leading-none">
+              <span aria-label="locked" className="text-xs leading-none opacity-60">
                 🔒
               </span>
             )}
@@ -95,13 +90,12 @@ export default function ItemTabs({
         );
       })}
 
-      {/* New item tab */}
       <button
         onClick={handleCreateItem}
         aria-label="Create new item"
         className="flex-none flex items-center gap-1 px-4 whitespace-nowrap min-h-[44px]
-                   text-sm font-medium text-gray-500 border-b-2 border-transparent
-                   hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                   text-sm font-medium text-gray-600 border-b-2 border-transparent
+                   hover:text-amber-400 hover:bg-gray-800/30 transition-colors"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -117,7 +111,7 @@ export default function ItemTabs({
           <line x1="12" y1="5" x2="12" y2="19" />
           <line x1="5" y1="12" x2="19" y2="12" />
         </svg>
-        New Item
+        New
       </button>
     </nav>
   );

@@ -310,9 +310,36 @@ This is the most complex single unit.
 
 ---
 
-## Phase 9: Deploy & Smoke Test
-**Agents: 1 Sonnet (fixes) + YOU (manual testing)**
+## Phase 9: UX Overhaul
+**Agents: 1 Sonnet (implementation) + YOU (design direction)**
 **Depends on: Phase 8 merged**
+
+Redesign the session page layout and interaction model based on `docs/UX_Notes.md`.
+
+### Tasks:
+1. **YOU:** Finalize CTA label and layout approach in `docs/UX_Notes.md`
+2. Implement new session page layout (map + bottom panel/card)
+3. Update CTA button with chosen label and one-press save behavior
+4. Compass bearing readout and GPS status in the action area (not floating on map)
+5. Move item tabs / session header to appropriate position in new layout
+6. Responsive pass at 375px, 390px, 428px viewports
+7. Deploy to dev for review
+8. **YOU:** Review on mobile device, provide feedback
+9. Iterate on feedback, re-deploy
+
+### Checkpoint 9:
+- New layout implemented per agreed design direction
+- CTA is the primary focal point, not the map
+- All existing functionality preserved (save, compass, GPS, items, triangulation)
+- Looks correct at all tested widths
+
+### PR → **Sonnet review**
+
+---
+
+## Phase 10: Deploy & Smoke Test
+**Agents: 1 Sonnet (fixes) + YOU (manual testing)**
+**Depends on: Phase 9 merged**
 
 ### Tasks:
 1. Deploy Firestore rules + indexes to dev: `firebase deploy --only firestore --project dev`
@@ -340,9 +367,10 @@ This is the most complex single unit.
 | 6 Session/Item Mgmt | 2 | — | Haiku | Yes (header + items) |
 | 7 Analytics/PWA/Errors | 1 | — | Haiku | No |
 | 8 Integration & Build | 1 | — | **Sonnet** | No |
-| 9 Deploy | 1 (fixes) | — | — | No |
+| 9 UX Overhaul | 1 | — | **Sonnet** | No |
+| 10 Deploy | 1 (fixes) | — | — | No |
 
-**Totals:** ~12 Sonnet, ~2 Haiku, 10 safe stopping points.
+**Totals:** ~13 Sonnet, ~2 Haiku, 11 safe stopping points.
 
 **Review strategy:** Sonnet reviews for math-critical (Phase 1), complex UI (Phases 4, 5), and integration (Phase 8). Haiku reviews for straightforward config/wiring phases.
 
@@ -362,7 +390,8 @@ Phase -1 (preflight)
                     └─► Phase 5 (capture flow)
                           └─► Phase 7 (analytics/PWA/errors)
                                 └─► Phase 8 (integration)
-                                      └─► Phase 9 (deploy)
+                                      └─► Phase 9 (UX overhaul)
+                                            └─► Phase 10 (deploy)
 ```
 
 Phases 1, 3, and 4 can run in parallel after Phase 0+2 are merged. Phase 5 is the convergence point where map + capture + triangulation all come together.

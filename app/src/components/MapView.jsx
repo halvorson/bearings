@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { deleteDoc, doc } from 'firebase/firestore';
@@ -190,6 +190,7 @@ export default function MapView({ sessionId, itemId }) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const initialCenteredRef = useRef(false);
+  const [styleLoaded, setStyleLoaded] = useState(false);
 
   const { lat: gpsLat, lng: gpsLng } = useGeolocation();
   const { dataPoints } = useDataPoints(sessionId, itemId);
@@ -203,7 +204,7 @@ export default function MapView({ sessionId, itemId }) {
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
       style: 'mapbox://styles/mapbox/streets-v12',
-      center: [0, 0],
+      center: [-122.4194, 37.7749],
       zoom: 17,
     });
 
@@ -211,6 +212,7 @@ export default function MapView({ sessionId, itemId }) {
 
     map.on('load', () => {
       addSourcesAndLayers(map);
+      setStyleLoaded(true);
     });
 
     // Tap-to-delete on own observer points
@@ -260,7 +262,7 @@ export default function MapView({ sessionId, itemId }) {
   // Update map layers whenever dataPoints or triangulation result change
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map || !styleLoaded) return;
 
     // --- observer-points source ---
     const observerFeatures = (dataPoints ?? []).map((dp) => ({
@@ -357,7 +359,7 @@ export default function MapView({ sessionId, itemId }) {
         features: [],
       });
     }
-  }, [dataPoints, result]);
+  }, [dataPoints, result, styleLoaded]);
 
   return <div ref={mapContainerRef} className="w-full h-full" />;
 }

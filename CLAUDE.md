@@ -13,6 +13,7 @@ Collaborative GPS + compass triangulation PWA. No auth — sessions shared via U
 - **TDD v0.2:** `docs/Bearings_TDD_v0.2.md` — authoritative technical spec
 - **PRD v0.3:** `docs/Bearings_PRD_v0.3.md` — product requirements
 - **Implementation Plan:** `docs/Implementation_Plan_v1.md` — phased build plan with checkpoints
+- **UX Notes:** `docs/UX_Notes.md` — design direction for Phase 9 UX overhaul
 
 ## Firebase Projects
 - Dev: `bearings-app-dev` (default)
@@ -22,6 +23,13 @@ Collaborative GPS + compass triangulation PWA. No auth — sessions shared via U
 - `app/.env.local` has Firebase config, Mapbox token, GA ID
 - Firebase emulators: Firestore on 8080, Functions on 5001, UI on 4000
 - Frontend connects to emulators automatically in dev mode (`import.meta.env.DEV`)
+
+## Testing Changes
+This is a mobile PWA that requires HTTPS for compass/orientation APIs. Local dev servers cannot test device features. After making changes, always deploy to the dev environment before asking the user to test:
+```
+cd app && npm run build && cd .. && firebase deploy --only hosting --project dev
+```
+Live URL: https://bearings-app-dev.web.app
 
 ## Key Architecture Decisions
 - No client-side triangulation preview — wait for Cloud Function result

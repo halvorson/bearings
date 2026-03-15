@@ -1,9 +1,30 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useSyncExternalStore } from 'react';
+
+// ── Shared permission state across all useCompass instances ──────────────
+// DeviceOrientationEvent.requestPermission() is page-level — once granted,
+// every hook instance must see 'granted' so they attach their listeners.
+let _permissionState = null;
+const _listeners = new Set();
+
+function getPermissionState() {
+  return _permissionState;
+}
+
+function subscribePermission(cb) {
+  _listeners.add(cb);
+  return () => _listeners.delete(cb);
+}
+
+function setSharedPermissionState(state) {
+  _permissionState = state;
+  _listeners.forEach((cb) => cb());
+}
 
 export function useCompass() {
   const [bearing, setBearing] = useState(null);
   const [calibrationQuality, setCalibrationQuality] = useState('unknown');
-  const [permissionState, setPermissionState] = useState(null);
+
+  const permissionState = useSyncExternalStore(subscribePermission, getPermissionState);
 
   const supported =
     typeof window !== 'undefined' && 'DeviceOrientationEvent' in window;
@@ -13,10 +34,10 @@ export function useCompass() {
     supported &&
     typeof DeviceOrientationEvent.requestPermission === 'function';
 
-  // Initialise permissionState for iOS devices that need a prompt
+  // Initialise shared permissionState once for iOS
   useEffect(() => {
-    if (requiresPermission) {
-      setPermissionState('prompt');
+    if (requiresPermission && _permissionState === null) {
+      setSharedPermissionState('prompt');
     }
   }, [requiresPermission]);
 
@@ -27,8 +48,8 @@ export function useCompass() {
     if (event.webkitCompassHeading != null) {
       // iOS: already degrees clockwise from magnetic north
       newBearing = event.webkitCompassHeading;
-    } else if (event.absolute && event.alpha != null) {
-      // Android with absolute orientation
+    } else if (event.alpha != null) {
+      // Android: alpha is degrees counter-clockwise from north (when absolute)
       newBearing = 360 - event.alpha;
     }
 
@@ -47,7 +68,7 @@ export function useCompass() {
         setCalibrationQuality('unknown');
       }
     } else if (event.alpha != null) {
-      // Android: treat non-absolute events as poor
+      // Android: absolute events are reliable, non-absolute are poor
       setCalibrationQuality(event.absolute ? 'good' : 'poor');
     }
   }, []);
@@ -57,9 +78,21 @@ export function useCompass() {
     if (!supported) return;
     if (requiresPermission && permissionState !== 'granted') return;
 
+    // Android Chrome fires absolute compass data on 'deviceorientationabsolute'.
+    // Fall back to 'deviceorientation' for iOS and browsers without it.
+    const hasAbsoluteEvent = 'ondeviceorientationabsolute' in window;
+
+    if (hasAbsoluteEvent) {
+      window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+    }
+    // Always attach the standard event too — iOS uses it exclusively,
+    // and Android will use it as a fallback if absolute isn't available.
     window.addEventListener('deviceorientation', handleOrientation, true);
 
     return () => {
+      if (hasAbsoluteEvent) {
+        window.removeEventListener('deviceorientationabsolute', handleOrientation, true);
+      }
       window.removeEventListener('deviceorientation', handleOrientation, true);
     };
   }, [supported, requiresPermission, permissionState, handleOrientation]);
@@ -69,9 +102,9 @@ export function useCompass() {
 
     try {
       const state = await DeviceOrientationEvent.requestPermission();
-      setPermissionState(state === 'granted' ? 'granted' : 'denied');
+      setSharedPermissionState(state === 'granted' ? 'granted' : 'denied');
     } catch {
-      setPermissionState('denied');
+      setSharedPermissionState('denied');
     }
   }, [requiresPermission]);
 
