@@ -1,10 +1,4 @@
 {
-  "indexes": [{
-    "collectionGroup": "dataPoints",
-    "queryScope": "COLLECTION",
-    "fields": [
-      { "fieldPath": "timestamp", "order": "ASCENDING" }
-    ]
-  }],
+  "indexes": [],
   "fieldOverrides": []
 }
