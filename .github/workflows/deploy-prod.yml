@@ -21,12 +21,19 @@ jobs:
       - name: Install functions deps
         working-directory: functions
         run: npm ci
-      - name: Deploy hosting & functions
+      - name: Deploy hosting
         uses: w9jds/firebase-action@v13.35.1
         with:
-          args: deploy --only hosting,functions --force --project prod
+          args: deploy --only hosting --force --project prod
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PROD }}
+      - name: Deploy functions
+        uses: w9jds/firebase-action@v13.35.1
+        with:
+          args: deploy --only functions --force --project prod
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PROD }}
+        continue-on-error: true
       - name: Deploy Firestore rules & indexes
         uses: w9jds/firebase-action@v13.35.1
         with:
