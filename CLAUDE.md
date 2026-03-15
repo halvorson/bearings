@@ -14,6 +14,7 @@ Collaborative GPS + compass triangulation PWA. No auth — sessions shared via U
 - **PRD v0.3:** `docs/Bearings_PRD_v0.3.md` — product requirements
 - **Implementation Plan:** `docs/Implementation_Plan_v1.md` — phased build plan with checkpoints
 - **UX Notes:** `docs/UX_Notes.md` — design direction for Phase 9 UX overhaul
+- **TODO Tracker:** `docs/TODO.md` — active bug/feature tracker with tiered workflow
 
 ## Firebase Projects
 - Dev: `bearings-app-dev` (default)
@@ -39,6 +40,10 @@ Live URL: https://bearings-app-dev.web.app
 - Errors: verbose in dev (full details + copy button), generic in prod
 - Compass calibration warning when accuracy is poor
 - `lowConfidence` flag when triangulation estimate is >2km from observers
+- `confidencePolygon` stored as JSON string in Firestore (nested arrays not supported); parsed on client
+- Delete mode: toggled in item settings panel, not direct tap-to-delete
+- Map auto-zooms to fit data points + triangulation estimate on item switch
+- Version number injected at build time via Vite `define` from package.json
 
 ## Conventions
 - Domain-generic: never reference birds, birdwatching, or similar — the core concept is "item"
@@ -46,6 +51,8 @@ Live URL: https://bearings-app-dev.web.app
 - Mapbox layers managed imperatively (not react-map-gl)
 - Firebase config is base64-encoded valid JSON (double-quoted keys)
 - GA4 events tracked via `src/lib/analytics.js` `track()` wrapper
+- CTA button text is "Record" (not "Mark" or "Track")
+- Version displayed in SessionHeader, sourced from `__APP_VERSION__` (Vite define)
 
 ## Bash Permissions Policy
 Use dedicated tools (Read, Edit, Write, Glob, Grep) instead of shell equivalents (`cat`, `head`, `sed`, `grep`, `find`, etc.). The allowlist in `.claude/settings.local.json` is intentionally minimal:
@@ -59,6 +66,8 @@ Do not add commands to the allowlist for one-off tasks — accept the permission
 
 ## Development Workflow
 - Opus coordinates, Sonnet writes code, Haiku does reviews and lightweight tasks
+- TODO tracker in `docs/TODO.md` with tiered workflow (small/medium/large)
+- Always bump version in `app/package.json` before deploying
 - Every phase ends with a checkpoint PR
 - Sonnet reviews for: triangulation math, Mapbox layers, capture flow, integration
 - Haiku reviews for: scaffold, config, wiring phases

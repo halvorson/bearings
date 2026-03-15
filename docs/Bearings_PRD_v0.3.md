@@ -1,10 +1,10 @@
 # Bearings — Product Requirements Document
-**Version 0.3 · March 2026 · Ready for Engineering**
+**Version 0.4 · March 2026 · Ready for Engineering**
 
 | | |
 |---|---|
 | **Status** | Ready for Engineering — All decisions resolved |
-| **Last Updated** | March 14, 2026 |
+| **Last Updated** | March 15, 2026 |
 | **Tech Stack** | React (Vite) · Firebase Hosting + Firestore + Cloud Functions · Mapbox GL JS · Google Analytics 4 |
 | **Primary Use Case** | Collaborative, GPS + compass-based triangulation of sound sources in the field |
 
@@ -132,7 +132,7 @@ Given two or more data points, the system computes the most likely item location
 ### 4.3 Recording a Data Point
 
 1. Participant hears the item and physically points their phone at the sound source direction.
-2. Taps "Track." (Disabled if the item is locked or has reached 10 data points.)
+2. Taps "Record." (Disabled if the item is locked or has reached 10 data points.)
 3. App captures GPS position (Geolocation API, high-accuracy mode) and compass heading (DeviceOrientationEvent absolute).
 4. If the device does not support absolute orientation, a manual bearing entry input is shown as fallback.
 5. Data point is written to Firestore under the active item.
@@ -141,10 +141,12 @@ Given two or more data points, the system computes the most likely item location
 
 ### 4.4 Deleting a Data Point
 
-1. Participant taps their own data point marker on the map (or a list entry in the sidebar).
-2. A confirmation prompt appears: "Delete this data point?"
-3. On confirm, the data point document is deleted from Firestore.
-4. Cloud Function triggers and recomputes triangulation with the remaining points.
+1. Participant opens item settings (by tapping the active item tab) and taps the delete mode button (trash icon).
+2. A red banner appears on the map: "Tap a point to remove it. This cannot be undone."
+3. Participant taps their own data point marker on the map.
+4. The data point is immediately deleted from Firestore (no confirmation dialog).
+5. Cloud Function triggers and recomputes triangulation with the remaining points.
+6. Delete mode is exited when the participant switches items or toggles it off.
 
 Only the participant whose token matches the data point's `participantToken` may delete it. This is enforced client-side in v1 (see security note in TDD §4.2).
 
@@ -177,7 +179,10 @@ Mapbox GL JS. Default style: streets (`mapbox://styles/mapbox/streets-v12`). The
 | Error wedges | Semi-transparent wedge (±5°) per ray showing orientation uncertainty. | Firestore real-time |
 | Triangulation pin | Prominent marker at computed item location. Shown only when ≥2 non-parallel data points exist. | Function result |
 | Confidence polygon | Convex hull of intersection region accounting for bearing error. Semi-transparent fill. | Function result |
+| Confidence polygon outline | Dashed red outline around the confidence polygon for visibility. | Function result |
 | GPS accuracy ring | Circle around each observer point reflecting GPS accuracy in meters. | Firestore real-time |
+
+The map auto-zooms to fit all data points and the triangulation estimate when the active item changes.
 
 ### 5.3 Real-Time Updates
 
@@ -201,6 +206,8 @@ For the confidence polygon: generate two additional rays per data point at `(bea
 ### 6.3 Implementation
 
 Firebase Cloud Function (Node.js 20), triggered by Firestore `onCreate` and `onDelete` on `dataPoints` documents. The function reads all current data points for the item, recomputes, and writes a `triangulation/result` document. Clients fetch the result via real-time listener.
+
+`confidencePolygon` is JSON-serialized (`JSON.stringify`) before being written to Firestore, because Firestore does not support nested arrays (required by the GeoJSON Polygon coordinates structure). The client parses it back with `JSON.parse` after reading.
 
 ### 6.4 Edge Cases
 
@@ -249,7 +256,7 @@ Single document with fixed ID "result". Written exclusively by the Cloud Functio
 |---|---|---|
 | `estimatedLat` | number | Computed best-estimate latitude |
 | `estimatedLng` | number | Computed best-estimate longitude |
-| `confidencePolygon` | map | GeoJSON Polygon object, or null |
+| `confidencePolygon` | string | JSON-serialized GeoJSON Polygon (Firestore does not support nested arrays). Parsed back to object on the client. Or null. |
 | `dataPointCount` | number | Count of points used in computation |
 | `insufficientSpread` | boolean | True if all bearings within 10° of each other |
 | `computedAt` | timestamp | Server timestamp of last computation |
@@ -264,7 +271,7 @@ Single document with fixed ID "result". Written exclusively by the Cloud Functio
 |---|---|
 | Framework | React 18 + Vite |
 | Styling | Tailwind CSS v3 |
-| State | Zustand (local UI) + Firestore real-time listeners (server state) |
+| State | Zustand (local UI: active item, `deleteMode`, etc.) + Firestore real-time listeners (server state) |
 | Routing | React Router v6. Route: `/?s=:sessionId` (query param) |
 | Map | Mapbox GL JS v3. Streets style default. |
 | Device APIs | Geolocation API (high-accuracy). DeviceOrientationEvent absolute. webkitCompassHeading fallback for iOS. |
@@ -359,15 +366,15 @@ File: `.github/workflows/deploy-prod.yml`
 | Screen | Purpose | Primary CTA |
 |---|---|---|
 | Home | Entry. Start or (future) resume a session. | Start New Session |
-| Session / Map | Live map, item tabs, share link, Track button. | Track |
+| Session / Map | Live map, item tabs, share link, Record button. Includes delete mode banner when active. | Record |
 | Capture overlay | Compass rose + GPS status. Confirm the bearing before writing. | Confirm |
-| Item settings | Rename or lock an item inline. | Save / Lock |
+| Item settings | Rename or lock an item inline. Includes delete mode toggle (trash icon). | Save / Lock |
 | Session header | Session name (editable), share link copy. | — |
 
 ### 11.2 Mobile-First Design Principles
 
 - All interactive tap targets ≥44 × 44px.
-- Track button: large, bottom-center, thumb-reachable. Full-width on narrow screens.
+- Record button: large, bottom-center, thumb-reachable. Full-width on narrow screens.
 - Map occupies the majority of the viewport. Controls overlay as floating cards.
 - Share link accessible from a persistent header icon; also surfaced on session creation.
 - Item tab bar scrolls horizontally if items overflow.
@@ -377,8 +384,8 @@ File: `.github/workflows/deploy-prod.yml`
 - New data points appear on map within ~2s of submission for all clients.
 - Triangulation result updates within ~5s (Cloud Function cold start budget).
 - A subtle spinner on the triangulation pin while the Function is computing.
-- At 10/10 data points: Track button is disabled; show "Max data points reached" message.
-- When `insufficientSpread` is true: show a map tooltip "Add points from different directions for a better result."
+- At 10/10 data points: Record button is disabled; show "Max data points reached" message.
+- When `insufficientSpread` is true: show a context-aware warning. If ≥3 data points exist: "Bearings are too parallel — move to a different angle." If <3 data points: "Add points from different directions for a better result."
 
 ---
 

@@ -32,7 +32,17 @@ export function useTriangulation(sessionId, itemId) {
       docRef,
       (snapshot) => {
         if (snapshot.exists()) {
-          setResult(snapshot.data());
+          const data = snapshot.data();
+          // confidencePolygon is stored as a JSON string in Firestore
+          // (nested arrays are not supported), so parse it back to an object.
+          if (typeof data.confidencePolygon === 'string') {
+            try {
+              data.confidencePolygon = JSON.parse(data.confidencePolygon);
+            } catch {
+              data.confidencePolygon = null;
+            }
+          }
+          setResult(data);
         } else {
           setResult(null);
         }

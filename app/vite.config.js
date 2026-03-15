@@ -37,7 +37,7 @@ export default defineConfig({
     })
   ],
   define: {
-    // Ensure env vars are available at build time
+    __APP_VERSION__: JSON.stringify(process.env.npm_package_version),
   },
   build: {
     outDir: 'dist',

@@ -20,8 +20,14 @@ exports.onDataPointWritten = onDocumentWritten(
     if (points.length === 0) {
       await resultRef.delete();
     } else {
+      // Firestore does not support nested arrays (e.g. [[[lng, lat], ...]])
+      // so we serialise the GeoJSON confidencePolygon as a JSON string.
+      const payload = { ...result };
+      if (payload.confidencePolygon != null) {
+        payload.confidencePolygon = JSON.stringify(payload.confidencePolygon);
+      }
       await resultRef.set({
-        ...result,
+        ...payload,
         computedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     }

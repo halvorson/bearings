@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useSession } from '../hooks/useSession';
 import { useItems } from '../hooks/useItems';
 import { useDataPoints } from '../hooks/useDataPoints';
@@ -15,7 +15,6 @@ import CompassCalibrationWarning from '../components/CompassCalibrationWarning';
 import SessionHeader from '../components/SessionHeader';
 import ItemTabs from '../components/ItemTabs';
 import GpsStatus from '../components/GpsStatus';
-import ItemSettingsPanel from '../components/ItemSettingsPanel';
 
 /**
  * Cardinal/intercardinal direction label for a bearing.
@@ -30,9 +29,9 @@ export default function Session({ id }) {
   const { items } = useItems(id);
   const activeItemId = useSessionStore((s) => s.activeItemId);
   const setActiveItem = useSessionStore((s) => s.setActiveItem);
+  const deleteMode = useSessionStore((s) => s.deleteMode);
   const { result } = useTriangulation(id, activeItemId);
   const { dataPoints } = useDataPoints(id, activeItemId);
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const activeItem = items.find((i) => i.id === activeItemId) ?? null;
   const { bearing, supported: compassSupported, calibrationQuality, permissionState } = useCompass();
@@ -93,108 +92,90 @@ export default function Session({ id }) {
 
   return (
     <div className="flex flex-col h-full w-full bg-gray-950">
-      {/* ── Map viewport ── */}
-      <div className="flex-1 relative min-h-0">
-        <MapView sessionId={id} itemId={activeItemId} />
+      {/* ── Session header ── */}
+      <SessionHeader sessionId={id} session={session} />
 
-        {/* Triangulation warnings — overlaid on map */}
-        {result && (
-          <div className="absolute bottom-2 left-0 right-0 z-10">
-            <TriangulationWarning
-              insufficientSpread={result.insufficientSpread}
-              lowConfidence={result.lowConfidence}
-            />
+      {/* ── Item tabs with inline settings ── */}
+      <ItemTabs
+        sessionId={id}
+        session={session}
+        items={items}
+        activeItemId={activeItemId}
+        activeItem={activeItem}
+        dataPointCount={dataPoints?.length ?? 0}
+        onSelectItem={setActiveItem}
+      />
+
+      {/* ── Map card ── */}
+      <div className="flex-1 min-h-0 px-3 py-2">
+        <div className="relative w-full h-full rounded-xl overflow-hidden ring-1 ring-white/10">
+          <MapView sessionId={id} itemId={activeItemId} />
+
+          {/* Delete mode banner */}
+          {deleteMode && (
+            <div className="absolute top-2 left-2 right-2 z-10">
+              <div className="rounded-lg bg-red-900/90 backdrop-blur-sm border border-red-500/30
+                              px-3 py-2.5 text-red-200 text-xs leading-snug">
+                Tap a point to remove it. This cannot be undone.
+              </div>
+            </div>
+          )}
+
+          {/* Triangulation warnings — overlaid inside map card */}
+          {result && (
+            <div className="absolute bottom-2 left-2 right-2 z-10">
+              <TriangulationWarning
+                insufficientSpread={result.insufficientSpread}
+                lowConfidence={result.lowConfidence}
+                dataPointCount={dataPoints?.length ?? 0}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Instrument row: bearing + GPS ── */}
+      <div className="flex-none px-4 py-2">
+        <div className="flex items-center justify-between">
+          {/* Bearing readout */}
+          <div className="flex items-baseline gap-2">
+            {compassSupported && permissionState !== 'prompt' ? (
+              <>
+                <span className="text-3xl font-mono font-bold text-amber-400 tabular-nums tracking-tight leading-none">
+                  {displayBearing != null ? `${displayBearing}\u00b0` : '\u2014'}
+                </span>
+                {displayBearing != null && (
+                  <span className="text-sm text-gray-500 font-medium tracking-widest uppercase">
+                    {bearingLabel(displayBearing)}
+                  </span>
+                )}
+              </>
+            ) : (
+              <span className="text-sm text-gray-500">
+                {compassSupported ? 'Tap Record to capture a bearing' : 'No compass — manual input'}
+              </span>
+            )}
+          </div>
+
+          {/* GPS status */}
+          <GpsStatus accuracy={accuracy} error={gpsError} />
+        </div>
+
+        {/* Compass calibration warning */}
+        {calibrationQuality === 'poor' && (
+          <div className="mt-2">
+            <CompassCalibrationWarning />
           </div>
         )}
       </div>
 
-      {/* ── Instrument panel ── */}
-      <div className="flex-none border-t-2 border-amber-500/40">
-        {/* Session header + item tabs */}
-        <SessionHeader sessionId={id} session={session} />
-        <div className="relative">
-          <ItemTabs
-            sessionId={id}
-            session={session}
-            items={items}
-            activeItemId={activeItemId}
-            onSelectItem={setActiveItem}
-          />
-          {/* Settings gear */}
-          {activeItem && (
-            <button
-              onClick={() => setSettingsOpen(true)}
-              aria-label="Item settings"
-              className="absolute right-1 top-0 z-10 flex items-center justify-center w-11 h-11
-                         rounded-full text-gray-500 hover:text-gray-200 hover:bg-gray-800
-                         active:bg-gray-700 transition-colors"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="w-4 h-4"
-                aria-hidden="true"
-              >
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
-            </button>
-          )}
-        </div>
-
-        {/* Bearing readout + GPS status */}
-        <div className="flex flex-col items-center py-4 px-4">
-          {compassSupported && permissionState !== 'prompt' ? (
-            <>
-              <p className="text-6xl font-mono font-bold text-amber-400 tabular-nums tracking-tight leading-none">
-                {displayBearing != null ? `${displayBearing}\u00b0` : '\u2014'}
-              </p>
-              {displayBearing != null && (
-                <p className="text-sm text-gray-500 font-medium mt-1 tracking-widest uppercase">
-                  {bearingLabel(displayBearing)}
-                </p>
-              )}
-            </>
-          ) : (
-            <p className="text-lg text-gray-500">
-              {compassSupported ? 'Tap Mark to enable compass' : 'No compass — manual input'}
-            </p>
-          )}
-
-          <div className="mt-3">
-            <GpsStatus accuracy={accuracy} error={gpsError} />
-          </div>
-
-          {calibrationQuality === 'poor' && (
-            <div className="mt-2 w-full max-w-sm">
-              <CompassCalibrationWarning />
-            </div>
-          )}
-        </div>
-
-        {/* Mark button */}
-        <div className="px-4 pb-4 pb-safe-b">
-          <TrackButton sessionId={id} />
-        </div>
+      {/* ── Mark CTA ── */}
+      <div className="flex-none px-4" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+        <TrackButton sessionId={id} />
       </div>
 
       {/* Capture overlay — manual bearing fallback only */}
       <CaptureOverlay sessionId={id} />
-
-      {/* Item settings panel */}
-      {settingsOpen && activeItem && (
-        <ItemSettingsPanel
-          sessionId={id}
-          item={activeItem}
-          dataPointCount={dataPoints.length}
-          onClose={() => setSettingsOpen(false)}
-        />
-      )}
     </div>
   );
 }

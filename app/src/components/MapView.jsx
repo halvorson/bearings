@@ -8,6 +8,7 @@ import { useGeolocation } from '../hooks/useGeolocation';
 import { useDataPoints } from '../hooks/useDataPoints';
 import { useTriangulation } from '../hooks/useTriangulation';
 import useSessionStore from '../store/useSessionStore';
+import useToastStore from '../store/useToastStore';
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
@@ -139,7 +140,20 @@ function addSourcesAndLayers(map) {
     source: 'confidence-polygon',
     paint: {
       'fill-color': '#EF4444',
-      'fill-opacity': 0.15,
+      'fill-opacity': 0.2,
+    },
+  });
+
+  // confidence-polygon outline
+  map.addLayer({
+    id: 'confidence-polygon-outline',
+    type: 'line',
+    source: 'confidence-polygon',
+    paint: {
+      'line-color': '#EF4444',
+      'line-width': 2,
+      'line-opacity': 0.6,
+      'line-dasharray': [4, 2],
     },
   });
 
@@ -180,6 +194,18 @@ function addSourcesAndLayers(map) {
       'circle-stroke-color': '#ffffff',
     },
   });
+
+  // Transparent hit-area layer above observer-points to ensure ≥44px tap target
+  map.addLayer({
+    id: 'observer-points-hitarea',
+    type: 'circle',
+    source: 'observer-points',
+    paint: {
+      'circle-radius': 22,
+      'circle-opacity': 0,
+      'circle-stroke-width': 0,
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -190,12 +216,19 @@ export default function MapView({ sessionId, itemId }) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const initialCenteredRef = useRef(false);
+  const lastFittedItemRef = useRef(null);
   const [styleLoaded, setStyleLoaded] = useState(false);
 
   const { lat: gpsLat, lng: gpsLng } = useGeolocation();
   const { dataPoints } = useDataPoints(sessionId, itemId);
   const { result } = useTriangulation(sessionId, itemId);
   const { participantToken } = useSessionStore();
+
+  const { deleteMode } = useSessionStore();
+
+  // Refs so the Mapbox click handler always reads current values
+  const propsRef = useRef({ sessionId, itemId, participantToken, dataPoints, deleteMode });
+  propsRef.current = { sessionId, itemId, participantToken, dataPoints, deleteMode };
 
   // Initialise map on mount
   useEffect(() => {
@@ -216,26 +249,35 @@ export default function MapView({ sessionId, itemId }) {
     });
 
     // Tap-to-delete on own observer points
-    map.on('click', 'observer-points', (e) => {
+    const handlePointClick = (e) => {
       if (!e.features || e.features.length === 0) return;
       const feature = e.features[0];
       const { pointId, participantToken: featureToken } = feature.properties;
+      const { sessionId: sid, itemId: iid, participantToken: token, dataPoints: pts, deleteMode: dm } = propsRef.current;
 
-      if (featureToken !== participantToken) return;
-
-      const confirmed = window.confirm('Delete this data point?');
-      if (!confirmed) return;
+      if (!dm) return;
+      if (featureToken !== token) return;
 
       deleteDoc(
-        doc(db, 'sessions', sessionId, 'items', itemId, 'dataPoints', pointId),
+        doc(db, 'sessions', sid, 'items', iid, 'dataPoints', pointId),
       ).then(() => {
-        track('data_point_deleted', { sessionId, itemId, point_count_after: dataPoints.length - 1 });
+        track('data_point_deleted', { sessionId: sid, itemId: iid, point_count_after: (pts?.length ?? 1) - 1 });
       }).catch((err) => {
         console.error('Failed to delete data point:', err);
+        useToastStore.getState().addToast({ error: err });
       });
-    });
+    };
+
+    map.on('click', 'observer-points-hitarea', handlePointClick);
+    map.on('click', 'observer-points', handlePointClick);
 
     // Change cursor on hover to indicate clickability
+    map.on('mouseenter', 'observer-points-hitarea', () => {
+      map.getCanvas().style.cursor = 'pointer';
+    });
+    map.on('mouseleave', 'observer-points-hitarea', () => {
+      map.getCanvas().style.cursor = '';
+    });
     map.on('mouseenter', 'observer-points', () => {
       map.getCanvas().style.cursor = 'pointer';
     });
@@ -258,6 +300,34 @@ export default function MapView({ sessionId, itemId }) {
     mapRef.current.flyTo({ center: [gpsLng, gpsLat], zoom: 17 });
     initialCenteredRef.current = true;
   }, [gpsLat, gpsLng]);
+
+  // Fit map to data points + triangulation estimate when item changes
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !styleLoaded) return;
+
+    const points = dataPoints ?? [];
+    if (points.length === 0) return;
+
+    // Only auto-fit when the item changes or on first load for this item
+    const fittingKey = `${itemId}:${points.length}`;
+    if (lastFittedItemRef.current === fittingKey) return;
+    lastFittedItemRef.current = fittingKey;
+
+    const coords = points.map((dp) => [dp.lng, dp.lat]);
+    if (result?.estimatedLat != null && result?.estimatedLng != null) {
+      coords.push([result.estimatedLng, result.estimatedLat]);
+    }
+
+    if (coords.length === 1) {
+      map.flyTo({ center: coords[0], zoom: 17, duration: 1000 });
+      return;
+    }
+
+    const bounds = new mapboxgl.LngLatBounds();
+    coords.forEach((c) => bounds.extend(c));
+    map.fitBounds(bounds, { padding: 60, maxZoom: 18, duration: 1000 });
+  }, [itemId, dataPoints, result, styleLoaded]);
 
   // Update map layers whenever dataPoints or triangulation result change
   useEffect(() => {

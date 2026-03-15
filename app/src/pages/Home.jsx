@@ -61,13 +61,13 @@ export default function Home() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-full bg-gray-50 p-4">
+    <div className="flex flex-col items-center justify-center h-full bg-gray-950 p-4">
       <div className="max-w-sm w-full text-center">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Bearings</h1>
+        <h1 className="text-3xl font-bold text-gray-100 mb-2">Bearings</h1>
         <p className="text-gray-500 mb-8">Collaborative GPS + compass triangulation</p>
 
         {error && (
-          <p className="text-red-600 text-sm mb-4" role="alert">
+          <p className="text-red-400 text-sm mb-4" role="alert">
             {error}
           </p>
         )}
@@ -75,12 +75,17 @@ export default function Home() {
         <button
           onClick={handleStart}
           disabled={loading}
-          className="w-full max-w-sm min-h-[44px] bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold text-base rounded-xl px-6 py-3 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          className="w-full max-w-sm min-h-[44px] bg-amber-500 hover:bg-amber-400
+                     disabled:bg-gray-700 disabled:text-gray-500
+                     text-gray-950 font-bold text-base rounded-xl px-6 py-3
+                     tracking-wide uppercase transition-colors
+                     focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2
+                     focus:ring-offset-gray-950"
         >
           {loading ? (
             <span className="flex items-center justify-center gap-2">
               <svg
-                className="animate-spin h-4 w-4 text-white"
+                className="animate-spin h-4 w-4"
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"

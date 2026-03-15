@@ -15,10 +15,12 @@ const useSessionStore = create((set) => ({
   activeItemId: null,
   participantToken: getOrCreateToken(),
   captureOverlayOpen: false,
+  deleteMode: false,
 
-  setActiveItem: (id) => set({ activeItemId: id }),
+  setActiveItem: (id) => set({ activeItemId: id, deleteMode: false }),
   openCapture: () => set({ captureOverlayOpen: true }),
   closeCapture: () => set({ captureOverlayOpen: false }),
+  setDeleteMode: (on) => set({ deleteMode: on }),
 }));
 
 export default useSessionStore;

@@ -1,10 +1,10 @@
 # Bearings — Technical Design Document
-**Version 0.2 · March 2026 · Companion to PRD v0.3**
+**Version 0.3 · March 2026 · Companion to PRD v0.4**
 
 | | |
 |---|---|
 | **Status** | Draft — Ready for implementation |
-| **PRD version** | v0.3 |
+| **PRD version** | v0.4 |
 | **Stack** | React 18 + Vite · Firebase (Hosting / Firestore / Functions v2) · Mapbox GL JS v3 · GA4 |
 | **Repo layout** | Monorepo: `/app` (frontend) + `/functions` (Cloud Functions) |
 
@@ -28,6 +28,12 @@
 | 8 | Added `lowConfidence` flag and quality check to triangulation algorithm (§5.2, §5.5) and result schema (§4.1) | Review #8 |
 | 9 | Clarified `onDocumentWritten` trigger choice in §5.1 | Review #9 |
 | 10 | Updated 10-point cap note: client-side enforcement only (§4.2, §12) | Review #10 |
+| 11 | `confidencePolygon` stored as JSON string in Firestore result doc (§4.1, §5.3) — Firestore rejects nested arrays | Bug fix |
+| 12 | Delete mode UX: toggle in item settings, not direct tap-to-delete (§7.2, §6.4) | UX redesign |
+| 13 | Map auto-zoom via `fitBounds` when switching items or data loads (§7.2) | Feature |
+| 14 | CTA renamed from "Mark"/"Track" to "Record" (§7.3, §6.4) | UX change |
+| 15 | Version display injected via Vite `define` from package.json (§6.1) | Feature |
+| 16 | Zustand store: added `deleteMode` and `setDeleteMode` (§6.3) | Feature |
 
 ---
 
@@ -40,7 +46,7 @@
 | 3 | Firestore schema & rules | Collection structure, security rules, indexes | AGENT |
 | 4 | Cloud Function — triangulation | onDocumentWritten trigger, math, result write | AGENT |
 | 5 | Frontend — core shell | Vite+React scaffold, routing, Firestore hooks, Zustand store | AGENT |
-| 6 | Frontend — map & capture | Mapbox integration, GPS/compass capture, Track flow | AGENT |
+| 6 | Frontend — map & capture | Mapbox integration, GPS/compass capture, Record flow | AGENT |
 | 7 | Frontend — session & item mgmt | Session name, item tabs, rename, lock, delete point | AGENT |
 | 8 | Analytics & PWA | GA4 events, manifest, service worker | AGENT |
 | 9 | End-to-end QA & deploy | Dev deploy, smoke test, prod deploy | AGENT + YOU |
@@ -241,7 +247,7 @@ Single document with fixed ID "result". Written exclusively by the Cloud Functio
 |---|---|---|
 | `estimatedLat` | number | Computed best-estimate latitude |
 | `estimatedLng` | number | Computed best-estimate longitude |
-| `confidencePolygon` | map | GeoJSON Polygon object (coordinates array), or null |
+| `confidencePolygon` | string | JSON-serialized GeoJSON Polygon object. Firestore does not support nested arrays in document fields. Value is null when unavailable. |
 | `dataPointCount` | number | Count of points used in computation |
 | `insufficientSpread` | boolean | True if all bearings within 10° of each other |
 | `lowConfidence` | boolean | True if estimated point is >2km from observer centroid |
@@ -305,7 +311,7 @@ service cloud.firestore {
 
 > **Security note on data point deletion:** Because the app uses no Firebase Auth, `participantToken` ownership cannot be verified server-side by Firestore rules in v1. Any client with the session link can technically delete any point. This matches the security-through-obscurity posture already established for session access. Revisit with Firebase Auth in v2 if needed.
 
-> **Note on 10-point cap:** The maximum of 10 data points per item is enforced client-side only in v1 (Track button disabled at cap). Firestore security rules cannot natively count subcollection documents. A Cloud Function pre-check could be added in v2.
+> **Note on 10-point cap:** The maximum of 10 data points per item is enforced client-side only in v1 (Record button disabled at cap). Firestore security rules cannot natively count subcollection documents. A Cloud Function pre-check could be added in v2.
 
 ### 4.3 Firestore Index
 
@@ -415,8 +421,12 @@ exports.onDataPointWritten = onDocumentWritten(
     if (points.length === 0) {
       await resultRef.delete();
     } else {
+      const payload = { ...result };
+      if (payload.confidencePolygon != null) {
+        payload.confidencePolygon = JSON.stringify(payload.confidencePolygon);
+      }
       await resultRef.set({
-        ...result,
+        ...payload,
         computedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
     }
@@ -441,6 +451,20 @@ exports.onDataPointWritten = onDocumentWritten(
 ### 6.1 Firebase SDK Init (src/lib/firebase.js)
 
 Firebase config is injected at build time from Vite env vars. The config object is stored as a single **valid JSON** secret (`VITE_FIREBASE_CONFIG_DEV` / `_PROD`), base64-encoded, and decoded at build time. The JSON must have double-quoted keys — do not use JavaScript object literal syntax.
+
+The app version is injected at build time via Vite's `define` option in `vite.config.js`, reading `version` from `package.json`:
+
+```js
+// vite.config.js (relevant excerpt)
+import { version } from './package.json';
+export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(version),
+  },
+});
+```
+
+Components access the version as the global `__APP_VERSION__` string (no import needed).
 
 ```js
 import { initializeApp } from 'firebase/app';
@@ -481,7 +505,8 @@ Stores local UI state only. Server state lives in Firestore and is subscribed to
 - `activeItemId`: string | null
 - `participantToken`: string (loaded from / written to localStorage on mount)
 - `captureOverlayOpen`: boolean
-- Actions: `setActiveItem`, `openCapture`, `closeCapture`
+- `deleteMode`: boolean — when true, observer points on the map are tappable for deletion
+- Actions: `setActiveItem` (also clears `deleteMode`), `openCapture`, `closeCapture`, `setDeleteMode`
 
 ### 6.4 Custom Hooks
 
@@ -490,7 +515,7 @@ Stores local UI state only. Server state lives in Firestore and is subscribed to
 | `useSession(sessionId)` | `sessions/{id}` document. Returns `{ session, loading, error }`. |
 | `useItems(sessionId)` | `sessions/{id}/items` ordered by `createdAt`. Returns `items[]`. |
 | `useDataPoints(sessionId, itemId)` | `dataPoints` sub-collection for active item. Returns `points[]`. |
-| `useTriangulation(sessionId, itemId)` | `triangulation/result` doc. Returns `result \| null`. |
+| `useTriangulation(sessionId, itemId)` | `triangulation/result` doc. Returns `result \| null`. JSON-parses the `confidencePolygon` string field back to a GeoJSON object before returning. |
 | `useGeolocation()` | Wraps `navigator.geolocation.watchPosition`. Returns `{ lat, lng, accuracy, error }`. |
 | `useCompass()` | Wraps `DeviceOrientationEvent`. Returns `{ bearing, supported, permissionState, calibrationQuality }`. See §7.3 for calibration details. |
 
@@ -514,7 +539,7 @@ Centralized error display logic. See §13 for full specification.
 | 🤖 AGENT | Write `src/lib/words.js` with adjective-noun generator | Navigation- and nature-themed words (~200 × 200), e.g. Crimson, Zenith, Meridian |
 | 🤖 AGENT | Write `src/lib/errors.js` per spec in §13 | — |
 | 🤖 AGENT | Write `Home.jsx` — single CTA page that creates a session and redirects | Writes to Firestore (including `itemCount: 1`), then sets `?s=` param |
-| 🤖 AGENT | Write `Session.jsx` — layout shell with map placeholder, item tabs, Track button | Map canvas, item selector, floating panels |
+| 🤖 AGENT | Write `Session.jsx` — layout shell with map placeholder, item tabs, Record button | Map canvas, item selector, floating panels |
 
 ---
 
@@ -536,15 +561,19 @@ All layers are managed imperatively via `map.addSource` / `map.addLayer` / `map.
 | Source ID | Layer Type | Data |
 |---|---|---|
 | `observer-points` | circle + symbol | Point per data point. Properties: token, sequence, accuracy. |
+| `observer-points-hitarea` | circle (transparent, radius 22px) | Invisible larger tap target overlaid on observer points to achieve the 44px minimum touch target on mobile. |
 | `bearing-rays` | line | LineString per data point. 500m extent from observer. |
 | `error-wedges` | fill | Polygon (wedge) per data point at bearing ±5°. |
 | `triangulation-point` | circle + symbol | Single Point at `estimatedLat`/`Lng`. Hidden if no result. |
-| `confidence-polygon` | fill | Polygon from `result.confidencePolygon`. Hidden if null. |
+| `confidence-polygon` | fill | Polygon from `result.confidencePolygon` (parsed from JSON string). Hidden if null. |
+| `confidence-polygon-outline` | line (dashed red) | Outline of the confidence polygon. Reuses the `confidence-polygon` source. Hidden if null. |
 | `accuracy-rings` | circle | Circle per observer with radius = accuracy metres. |
+
+> **Auto-zoom:** On item switch or data point arrival, the map calls `fitBounds` to frame all observer points and the triangulation estimate with 60px padding. This keeps all relevant data visible without requiring the user to manually pan or zoom.
 
 ### 7.3 Capture Overlay
 
-A full-screen modal overlay shown when the user taps Track. Contains:
+A full-screen modal overlay shown when the user taps Record. Contains:
 
 - A live compass rose SVG that rotates in real time with `useCompass()` output.
 - Current GPS coordinates and accuracy indicator (green < 10m, amber < 20m, red ≥ 20m).
@@ -562,7 +591,7 @@ A full-screen modal overlay shown when the user taps Track. Contains:
 | 🤖 AGENT | Write layer update logic: on `dataPoints` change, call `source.setData()` for each affected layer | Called from `useEffect` watching `dataPoints` and `result` |
 | 🤖 AGENT | Write `CaptureOverlay` component with live compass rose SVG and calibration warning | Uses `useCompass()` and `useGeolocation()` |
 | 🤖 AGENT | Write data point write logic: `addDoc` to `dataPoints` sub-collection with all required fields | Includes GA4 event fire |
-| 🤖 AGENT | Write data point delete logic: `deleteDoc` + confirmation prompt | Match `participantToken` client-side before showing delete option |
+| 🤖 AGENT | Write data point delete logic: `deleteDoc` via delete mode toggle in item settings | Delete mode activated via `setDeleteMode`; tapping an observer point in delete mode triggers deletion |
 
 ---
 
@@ -588,6 +617,7 @@ A full-screen modal overlay shown when the user taps Track. Contains:
 - Inline name editor: text input, updates Firestore on blur/enter.
 - Lock toggle: switches `item.locked`. Shows confirmation if locking ("Locking prevents new data points.").
 - Shows current data point count / 10 cap.
+- Delete mode toggle: activates `deleteMode` in the Zustand store. While active, a `DeleteModeBanner` is shown on the map and tapping any observer point prompts for deletion. Switching items (via `setActiveItem`) automatically clears delete mode.
 
 ### 8.4 Phase 7 Task Ownership
 
@@ -642,10 +672,10 @@ After first full deploy to `bearings-app-dev`, verify:
 - [ ] Home page loads, "Start New Session" creates a session and redirects to `/?s=...`
 - [ ] Share link copies to clipboard.
 - [ ] Joining session on a second device (or incognito window) shows the live map.
-- [ ] Track records a data point; it appears on both devices' maps within 2s.
+- [ ] Record records a data point; it appears on both devices' maps within 2s.
 - [ ] Second data point from a different position produces a triangulation pin on both maps.
 - [ ] Item rename propagates to both devices in real time.
-- [ ] Item lock disables Track button on both devices.
+- [ ] Item lock disables Record button on both devices.
 - [ ] Data point delete removes the point and updates triangulation on both devices.
 - [ ] Max 10 points: 11th tap shows "Max data points reached."
 - [ ] GA4 DebugView shows events firing correctly.
@@ -683,8 +713,9 @@ App
       │   ├── ItemTab (x N)           # name, locked badge
       │   └── NewItemTab
       ├── MapView                     # Mapbox GL canvas
-      │   └── [imperative layer management]
-      ├── TrackButton                 # floating, bottom-center
+      │   ├── [imperative layer management]
+      │   └── DeleteModeBanner        # amber banner shown when deleteMode is active; tap an observer point to delete it
+      ├── RecordButton                # floating, bottom-center
       ├── CaptureOverlay              # conditional modal
       │   ├── CompassRose             # SVG, live rotation
       │   ├── CompassCalibrationWarning  # amber banner if poor calibration
@@ -704,7 +735,7 @@ App
 
 | Risk | Likelihood | Mitigation |
 |---|---|---|
-| iOS compass permission dialog not firing | High — iOS 13+ requires user gesture | Trigger `DeviceMotionEvent.requestPermission()` inside the Track button click handler, not on mount |
+| iOS compass permission dialog not firing | High — iOS 13+ requires user gesture | Trigger `DeviceMotionEvent.requestPermission()` inside the Record button click handler, not on mount |
 | GPS accuracy too low in dense cover | Medium | Show accuracy warning at > 20m; store accuracy per point for v2 weighting |
 | Function cold start > 5s on first trigger | Medium | Use `min-instances: 1` in Functions v2 config for prod (small cost) |
 | Parallel bearings produce degenerate intersection | Medium — common in practice | `insufficientSpread` flag + UI hint; threshold at 10° spread |
@@ -753,7 +784,7 @@ Function errors are silent to the client — the triangulation result simply won
 
 ### 13.5 GPS & Compass Errors
 
-- **GPS permission denied:** Persistent banner: "Location access is required to use Bearings. Please enable it in your browser settings." Track button disabled.
+- **GPS permission denied:** Persistent banner: "Location access is required to use Bearings. Please enable it in your browser settings." Record button disabled.
 - **GPS unavailable:** Same banner with "Location is not available on this device."
 - **Compass unavailable:** Automatic fallback to manual bearing input (§7.3). No error banner — manual input is the designed fallback.
 - **Poor compass calibration:** Amber warning in capture overlay (§7.3).

@@ -69,6 +69,9 @@ export default function SessionHeader({ sessionId, session }) {
 
   return (
     <header className="bg-gray-950 px-4 py-1 flex items-center gap-2">
+      <span className="absolute top-1 right-14 text-[9px] text-gray-700 font-mono select-none pointer-events-none">
+        v{__APP_VERSION__}
+      </span>
       <input
         ref={inputRef}
         type="text"

@@ -4,21 +4,23 @@ function Banner({ message, onDismiss }) {
   return (
     <div
       role="alert"
-      className="flex items-start gap-3 rounded-lg bg-amber-50 px-4 py-3 shadow-md text-amber-800 text-sm"
+      className="flex items-start gap-2 rounded-lg bg-gray-900/90 backdrop-blur-sm
+                 border border-amber-500/20 px-3 py-2.5 text-amber-300 text-xs"
     >
       <span className="flex-1 leading-snug">{message}</span>
       <button
         type="button"
         onClick={onDismiss}
         aria-label="Dismiss warning"
-        className="ml-1 flex-shrink-0 rounded p-0.5 hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-400 min-w-[44px] min-h-[44px] flex items-center justify-center"
+        className="ml-1 flex-shrink-0 rounded p-0.5 hover:bg-white/10
+                   focus:outline-none min-w-[44px] min-h-[44px]
+                   flex items-center justify-center"
       >
-        {/* Simple × glyph — no emoji */}
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 20 20"
           fill="currentColor"
-          className="w-4 h-4"
+          className="w-3.5 h-3.5"
           aria-hidden="true"
         >
           <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
@@ -30,15 +32,9 @@ function Banner({ message, onDismiss }) {
 
 /**
  * Dismissible warning banners for triangulation quality issues.
- *
- * Props:
- *   insufficientSpread {boolean} — all bearings are too similar
- *   lowConfidence      {boolean} — estimated point is far from observer centroid
- *
- * Each banner is independently dismissible via local state. Banners re-appear
- * if the parent re-mounts (e.g. when the user switches items).
+ * Dark themed to sit inside the map card.
  */
-export default function TriangulationWarning({ insufficientSpread, lowConfidence }) {
+export default function TriangulationWarning({ insufficientSpread, lowConfidence, dataPointCount = 0 }) {
   const [spreadDismissed, setSpreadDismissed] = useState(false);
   const [confidenceDismissed, setConfidenceDismissed] = useState(false);
 
@@ -48,11 +44,15 @@ export default function TriangulationWarning({ insufficientSpread, lowConfidence
   if (!showSpread && !showConfidence) return null;
 
   return (
-    <div className="px-3 pt-2 flex flex-col gap-2 pointer-events-none">
+    <div className="flex flex-col gap-2 pointer-events-none">
       {showSpread && (
         <div className="pointer-events-auto">
           <Banner
-            message="Bearings are too similar. Add points from different directions for a better result."
+            message={
+              dataPointCount >= 3
+                ? "Bearings are too similar. Tap a point on the map to remove a conflicting reading."
+                : "Bearings are too similar to triangulate. Try marking from a different angle."
+            }
             onDismiss={() => setSpreadDismissed(true)}
           />
         </div>
@@ -60,7 +60,7 @@ export default function TriangulationWarning({ insufficientSpread, lowConfidence
       {showConfidence && (
         <div className="pointer-events-auto">
           <Banner
-            message="Result may be inaccurate. Try adding points from different angles, or delete a point that seems off."
+            message="Location estimate may be far off. Tap a point on the map to remove a bad reading, or create a new item if the target has moved."
             onDismiss={() => setConfidenceDismissed(true)}
           />
         </div>

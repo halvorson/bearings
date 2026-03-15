@@ -251,6 +251,63 @@ describe('confidence polygon', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Real-world regression: Woodpile item (session To24wzxz)
+// Two observers ~100m apart, bearings ~4° and ~95° (91° spread).
+// ---------------------------------------------------------------------------
+
+describe('real-world regression — Woodpile data', () => {
+  const woodpilePoints = [
+    { lat: 37.795427479977754, lng: -122.4711130687097,  bearing: 4.3044924736022949, accuracy: 4.0536611848723059 },
+    { lat: 37.796267920282467, lng: -122.47159846489456, bearing: 95.232177734375,    accuracy: 6.224364892465994  },
+  ];
+
+  it('produces a valid estimate (not flagged insufficient or degenerate)', () => {
+    const result = computeTriangulation(woodpilePoints);
+
+    expect(result.dataPointCount).toBe(2);
+    expect(result.insufficientSpread).toBe(false);
+    expect(result.lowConfidence).toBe(false);
+    expect(result.estimatedLat).toBeDefined();
+    expect(result.estimatedLng).toBeDefined();
+  });
+
+  it('estimates a point within 100 m of the observer centroid', () => {
+    const result = computeTriangulation(woodpilePoints);
+
+    const centroidLat = (woodpilePoints[0].lat + woodpilePoints[1].lat) / 2;
+    const centroidLng = (woodpilePoints[0].lng + woodpilePoints[1].lng) / 2;
+
+    const dist = haversineDistance(
+      result.estimatedLat,
+      result.estimatedLng,
+      centroidLat,
+      centroidLng,
+    );
+    expect(dist).toBeLessThan(100);
+  });
+
+  it('produces a confidence polygon with valid GeoJSON structure', () => {
+    const result = computeTriangulation(woodpilePoints);
+
+    expect(result.confidencePolygon).not.toBeNull();
+    expect(result.confidencePolygon.type).toBe('Polygon');
+
+    const ring = result.confidencePolygon.coordinates[0];
+    expect(ring.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('confidencePolygon survives JSON serialisation round-trip (Firestore workaround)', () => {
+    const result = computeTriangulation(woodpilePoints);
+    const serialised = JSON.stringify(result.confidencePolygon);
+    const parsed = JSON.parse(serialised);
+
+    expect(parsed).toEqual(result.confidencePolygon);
+    expect(parsed.type).toBe('Polygon');
+    expect(parsed.coordinates[0].length).toBeGreaterThanOrEqual(4);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Low confidence
 // ---------------------------------------------------------------------------
 

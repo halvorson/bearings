@@ -35,7 +35,7 @@ export default function TrackButton({ sessionId }) {
 
   // Determine disabled state and label
   let disabled = false;
-  let label = 'Mark';
+  let label = 'Record';
 
   if (saving) {
     disabled = true;
