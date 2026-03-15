@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase.js';
+import useToastStore from '../store/useToastStore.js';
 
 export function useTriangulation(sessionId, itemId) {
   const [result, setResult] = useState(null);
@@ -40,6 +41,7 @@ export function useTriangulation(sessionId, itemId) {
       (err) => {
         setError(err);
         setLoading(false);
+        useToastStore.getState().addToast({ error: err });
       }
     );
 

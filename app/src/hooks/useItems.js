@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase.js';
+import useToastStore from '../store/useToastStore.js';
 
 export function useItems(sessionId) {
   const [items, setItems] = useState([]);
@@ -30,6 +31,7 @@ export function useItems(sessionId) {
       (err) => {
         setError(err);
         setLoading(false);
+        useToastStore.getState().addToast({ error: err });
       }
     );
 

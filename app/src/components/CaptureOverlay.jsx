@@ -58,7 +58,7 @@ export default function CaptureOverlay({ sessionId }) {
         }
       );
 
-      track('data_point_recorded', { sessionId, itemId: activeItemId });
+      track('data_point_recorded', { sessionId, itemId: activeItemId, gps_accuracy_m: accuracy ?? null });
       if (!compassSupported) {
         track('manual_bearing_used');
       }

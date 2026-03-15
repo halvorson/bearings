@@ -66,7 +66,7 @@ export default function ItemSettingsPanel({
     setShowLockConfirm(false);
     try {
       await updateDoc(itemRef, { locked: newLockedValue });
-      track(newLockedValue ? 'item_locked' : 'item_unlocked');
+      track(newLockedValue ? 'item_locked' : 'item_unlocked', newLockedValue ? { locked: true } : undefined);
     } catch (err) {
       console.error('Failed to toggle item lock:', err);
     }

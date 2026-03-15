@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase.js';
+import useToastStore from '../store/useToastStore.js';
 
 export function useSession(sessionId) {
   const [session, setSession] = useState(null);
@@ -32,6 +33,7 @@ export function useSession(sessionId) {
       (err) => {
         setError(err);
         setLoading(false);
+        useToastStore.getState().addToast({ error: err });
       }
     );
 

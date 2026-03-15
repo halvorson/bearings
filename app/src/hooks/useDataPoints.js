@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase.js';
+import useToastStore from '../store/useToastStore.js';
 
 export function useDataPoints(sessionId, itemId) {
   const [dataPoints, setDataPoints] = useState([]);
@@ -36,6 +37,7 @@ export function useDataPoints(sessionId, itemId) {
       (err) => {
         setError(err);
         setLoading(false);
+        useToastStore.getState().addToast({ error: err });
       }
     );
 

@@ -227,7 +227,7 @@ export default function MapView({ sessionId, itemId }) {
       deleteDoc(
         doc(db, 'sessions', sessionId, 'items', itemId, 'dataPoints', pointId),
       ).then(() => {
-        track('data_point_deleted', { sessionId, itemId });
+        track('data_point_deleted', { sessionId, itemId, point_count_after: dataPoints.length - 1 });
       }).catch((err) => {
         console.error('Failed to delete data point:', err);
       });
