@@ -28,3 +28,5 @@
 | 10 | done   | small  | CTA button: "Mark" → "Record"                                                           |
 | 11 | done   | small  | Error polygon investigated — correct math, large shape due to similar bearings (4° + 27°) |
 | 12 | done   | small  | Bottom padding — replaced conflicting pb-6/pb-safe-b with max() inline style              |
+| 13 | done   | medium | Home button in SessionHeader — navigate back to home screen from any session               |
+| 14 | done   | medium | Recent sessions on Home — localStorage-backed "Jump Back In" list with timeAgo + remove    |
