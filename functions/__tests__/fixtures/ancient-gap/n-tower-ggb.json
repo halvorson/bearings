@@ -1,0 +1,42 @@
+{
+  "name": "N Tower GGB",
+  "knownLocation": {
+    "lat": 37.82547835516429,
+    "lng": -122.47897218629134,
+    "source": "Google Maps satellite imagery",
+    "description": "North tower (Marin side) of the Golden Gate Bridge"
+  },
+  "notes": "3 observations from different vantage points. Point index 2 (Hawk Hill, bearing 54.9) was taken near a metal railing and suspected of magnetic interference, though leave-one-out analysis shows all three readings have significant error. Algorithm flags this as lowConfidence (estimate >2km from observer centroid).",
+  "dataPoints": [
+    {
+      "id": "1j9oFnJpLTKkCYajrXqh",
+      "lat": 37.807003794959115,
+      "lng": -122.47246218868105,
+      "bearing": 331.8048095703125,
+      "accuracy": 4.748651530191761,
+      "participantToken": "76c8c492-88f1-49ea-90e3-6d566e0273f4",
+      "timestamp": "2026-03-17T01:41:51.460Z",
+      "vantagePoint": "Hawk Hill overlook area"
+    },
+    {
+      "id": "W3E2KqZpMFP5Fawywr1N",
+      "lat": 37.800414615665495,
+      "lng": -122.47823770796029,
+      "bearing": 6.9012274742126465,
+      "accuracy": 4.748651530191761,
+      "participantToken": "76c8c492-88f1-49ea-90e3-6d566e0273f4",
+      "timestamp": "2026-03-16T00:37:05.023Z",
+      "vantagePoint": "Baker Beach area"
+    },
+    {
+      "id": "g8Mbcrv80vDGCoiBkZ9R",
+      "lat": 37.826963751513844,
+      "lng": -122.49917055980461,
+      "bearing": 54.9205322265625,
+      "accuracy": 4.210217522099167,
+      "participantToken": "76c8c492-88f1-49ea-90e3-6d566e0273f4",
+      "timestamp": "2026-03-15T23:45:50.982Z",
+      "vantagePoint": "Battery Spencer area (near metal railing — suspected magnetic interference)"
+    }
+  ]
+}

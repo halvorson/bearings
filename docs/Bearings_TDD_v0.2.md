@@ -35,6 +35,16 @@
 | 15 | Version display injected via Vite `define` from package.json (§6.1) | Feature |
 | 16 | Zustand store: added `deleteMode` and `setDeleteMode` (§6.3) | Feature |
 
+### Changelog (v0.2 → v0.3)
+
+| # | Change | Source |
+|---|---|---|
+| 1 | Added §14: Live Bearing Preview — two-step "Start Bearing" → "Save Bearing" capture flow | v0.3.0 feature |
+| 2 | Zustand store: added `previewMode`, `startPreview()`, `stopPreview()` (§6.3, §14.2) | v0.3.0 feature |
+| 3 | Map layers: added `preview-location`, `preview-bearing-ray` sources and `preview-marker`, `preview-ray` layers (§7.2, §14.3) | v0.3.0 feature |
+| 4 | CTA replaced with state-machine-driven component: `idle` → `previewing` → `saving` → `idle` (§14.1) | v0.3.0 feature |
+| 5 | `CaptureOverlay` retained as manual-input fallback for devices without compass; `TrackButton` updated with two-step flow (§14) | v0.3.0 feature |
+
 ---
 
 ## 1. Implementation Plan Overview
@@ -506,7 +516,8 @@ Stores local UI state only. Server state lives in Firestore and is subscribed to
 - `participantToken`: string (loaded from / written to localStorage on mount)
 - `captureOverlayOpen`: boolean
 - `deleteMode`: boolean — when true, observer points on the map are tappable for deletion
-- Actions: `setActiveItem` (also clears `deleteMode`), `openCapture`, `closeCapture`, `setDeleteMode`
+- `previewMode`: boolean — when true, the user is actively previewing a bearing before saving (see §14)
+- Actions: `setActiveItem` (also clears `deleteMode` and `previewMode`), `openCapture`, `closeCapture`, `setDeleteMode`, `startPreview`, `stopPreview`
 
 ### 6.4 Custom Hooks
 
@@ -568,28 +579,31 @@ All layers are managed imperatively via `map.addSource` / `map.addLayer` / `map.
 | `confidence-polygon` | fill | Polygon from `result.confidencePolygon` (parsed from JSON string). Hidden if null. |
 | `confidence-polygon-outline` | line (dashed red) | Outline of the confidence polygon. Reuses the `confidence-polygon` source. Hidden if null. |
 | `accuracy-rings` | circle | Circle per observer with radius = accuracy metres. |
+| `preview-location` | — (GeoJSON source only) | Single GeoJSON Point at the user's live GPS position. Empty FeatureCollection when `previewMode` is false. |
+| `preview-bearing-ray` | — (GeoJSON source only) | Single GeoJSON LineString from the user's live GPS position in the live compass heading direction, 500m extent. Empty FeatureCollection when `previewMode` is false. |
+| `preview-marker` | circle | Rendered from `preview-location`. Green fill, white stroke. Visually distinct from saved blue observer points. Rendered above saved data layers, below `triangulation-point`. |
+| `preview-ray` | line (dashed) | Rendered from `preview-bearing-ray`. Amber/yellow stroke, `line-dasharray` pattern. Visually distinct from saved blue bearing rays. Same z-order as `preview-marker`. |
 
 > **Auto-zoom:** On item switch or data point arrival, the map calls `fitBounds` to frame all observer points and the triangulation estimate with 60px padding. This keeps all relevant data visible without requiring the user to manually pan or zoom.
 
-### 7.3 Capture Overlay
+### 7.3 Capture Flow
 
-A full-screen modal overlay shown when the user taps Record. Contains:
+> **v0.3.0:** The single-tap "Record" flow has been replaced with a two-step "Start Bearing" → "Save Bearing" Live Bearing Preview flow. See §14 for the full specification.
 
-- A live compass rose SVG that rotates in real time with `useCompass()` output.
-- Current GPS coordinates and accuracy indicator (green < 10m, amber < 20m, red ≥ 20m).
-- A "Confirm" button that writes the data point to Firestore and closes the overlay.
-- A "Cancel" button.
-- If compass not supported: a numeric bearing input (0–360) replaces the compass rose.
-- On iOS: triggers `DeviceMotionEvent.requestPermission()` before showing the overlay if not yet granted.
-- **Compass calibration warning:** When `webkitCompassAccuracy` (iOS) reports accuracy > 15°, or when `DeviceOrientationEvent.absolute` is false on Android (indicating the compass may be unreliable), display an amber warning banner: "Compass may be inaccurate. Try moving away from metal objects or calibrate by moving your phone in a figure-8." The `useCompass()` hook should expose a `calibrationQuality` field: `'good'`, `'poor'`, or `'unknown'`.
+The `TrackButton` component now implements a two-step CTA with preview mode. The `CaptureOverlay` component is retained as a manual-input fallback for devices without compass support (same single-step flow as before). See §14.1 for the state machine.
+
+Compass calibration considerations continue to apply during preview mode:
+- **Compass calibration warning:** When `webkitCompassAccuracy` (iOS) reports accuracy > 15°, or when `DeviceOrientationEvent.absolute` is false on Android, display a warning via `CompassCalibrationWarning` component. The `useCompass()` hook exposes `calibrationQuality`: `'good'`, `'poor'`, or `'unknown'`.
+- On iOS: `DeviceOrientationEvent.requestPermission()` is triggered when the user taps "Start Bearing" if permission has not yet been granted.
+- If compass is not supported: `CaptureOverlay` opens with a numeric bearing input (0–360) as the manual-entry fallback.
 
 ### 7.4 Phase 6 Task Ownership
 
 | Owner | Task | Notes |
 |---|---|---|
-| 🤖 AGENT | Install `mapbox-gl` v3 and write `MapView` component with all six sources/layers | Imperative GL JS, not react-map-gl |
+| 🤖 AGENT | Install `mapbox-gl` v3 and write `MapView` component with all sources/layers including preview layers | Imperative GL JS, not react-map-gl |
 | 🤖 AGENT | Write layer update logic: on `dataPoints` change, call `source.setData()` for each affected layer | Called from `useEffect` watching `dataPoints` and `result` |
-| 🤖 AGENT | Write `CaptureOverlay` component with live compass rose SVG and calibration warning | Uses `useCompass()` and `useGeolocation()` |
+| 🤖 AGENT | Write preview layer update logic: update `preview-location` and `preview-bearing-ray` sources from live GPS/compass when `previewMode` is true; clear to empty FeatureCollection when false | See §14.3 |
 | 🤖 AGENT | Write data point write logic: `addDoc` to `dataPoints` sub-collection with all required fields | Includes GA4 event fire |
 | 🤖 AGENT | Write data point delete logic: `deleteDoc` via delete mode toggle in item settings | Delete mode activated via `setDeleteMode`; tapping an observer point in delete mode triggers deletion |
 
@@ -714,14 +728,13 @@ App
       │   └── NewItemTab
       ├── MapView                     # Mapbox GL canvas
       │   ├── [imperative layer management]
-      │   └── DeleteModeBanner        # amber banner shown when deleteMode is active; tap an observer point to delete it
-      ├── RecordButton                # floating, bottom-center
-      ├── CaptureOverlay              # conditional modal
-      │   ├── CompassRose             # SVG, live rotation
-      │   ├── CompassCalibrationWarning  # amber banner if poor calibration
-      │   ├── GpsStatus               # accuracy indicator
-      │   ├── ManualBearingInput      # fallback
-      │   └── [Confirm / Cancel]
+      │   ├── DeleteModeBanner        # amber banner shown when deleteMode is active; tap an observer point to delete it
+      │   └── CompassCalibrationWarning  # amber banner shown when calibration is poor
+      ├── TrackButton                 # two-step CTA; state-machine-driven (see §14.1)
+      │   ├── [idle]    "Start Bearing" button (amber)
+      │   ├── [previewing] "Save Bearing" (green) + "Cancel" buttons
+      │   └── [saving]  disabled "Saving…" button
+      ├── CaptureOverlay              # manual bearing input fallback when compass unsupported
       ├── TriangulationWarning        # banner for lowConfidence / insufficientSpread
       └── ItemSettingsPanel           # slide-up sheet
           ├── InlineNameEditor        # item.name
@@ -784,10 +797,10 @@ Function errors are silent to the client — the triangulation result simply won
 
 ### 13.5 GPS & Compass Errors
 
-- **GPS permission denied:** Persistent banner: "Location access is required to use Bearings. Please enable it in your browser settings." Record button disabled.
+- **GPS permission denied:** Persistent banner: "Location access is required to use Bearings. Please enable it in your browser settings." "Start Bearing" CTA disabled.
 - **GPS unavailable:** Same banner with "Location is not available on this device."
-- **Compass unavailable:** Automatic fallback to manual bearing input (§7.3). No error banner — manual input is the designed fallback.
-- **Poor compass calibration:** Amber warning in capture overlay (§7.3).
+- **Compass unavailable:** Automatic fallback to manual bearing input panel during preview mode (§7.3). No error banner — manual input is the designed fallback.
+- **Poor compass calibration:** Amber warning banner on the map during preview mode (§7.3).
 
 ### 13.6 Triangulation Quality Warnings
 
@@ -795,3 +808,127 @@ Displayed as a dismissible banner on the map view:
 
 - **`insufficientSpread: true`:** "Bearings are too similar. Add points from different directions for a better result."
 - **`lowConfidence: true`:** "Result may be inaccurate. Try adding points from different angles, or delete a point that seems off."
+
+---
+
+## 14. Live Bearing Preview (v0.3.0)
+
+The single-tap "Record" capture flow is replaced with a two-step "Start Bearing" → "Save Bearing" flow. The user positions themselves, taps "Start Bearing" to enter preview mode, sees their live GPS position and compass heading rendered on the map in real time, then taps "Save Bearing" to commit the data point. This gives the user a visual confirmation of what they are about to record before writing to Firestore.
+
+### 14.1 CTA State Machine
+
+The `TrackButton` component is a floating bottom-center button that implements the following state machine. State is stored in the Zustand store via `previewMode` (see §14.2); the saving in-progress state is local component state.
+
+```
+idle ──[tap "Start Bearing"]──► previewing ──[tap "Save Bearing"]──► saving ──[success]──► idle
+                                     │                                   │
+                                     └──[tap "Cancel"]──► idle           └──[error]──► previewing
+```
+
+| State | CTA label | CTA enabled | Additional UI |
+|---|---|---|---|
+| `idle` | "Start Bearing" | Yes (unless GPS denied or item locked) | — |
+| `previewing` | "Save Bearing" | Yes | "Cancel" button also shown |
+| `saving` | "Saving…" | No (disabled) | — |
+
+**Transitions:**
+
+- **`idle` → `previewing`:** User taps "Start Bearing". Calls `startPreview()` in the store. On iOS, triggers `DeviceMotionEvent.requestPermission()` first if not yet granted; if denied, stays in `idle`. Map auto-pans to the user's current GPS location.
+- **`previewing` → `saving`:** User taps "Save Bearing". Sets local `saving` state to true. Executes the `addDoc` write to the `dataPoints` sub-collection (same Firestore write as the previous "Record" flow).
+- **`saving` → `idle`:** Write succeeds. Calls `stopPreview()`. Local `saving` state cleared.
+- **`saving` → `previewing`:** Write fails. Local `saving` state cleared. Error toast displayed (per §13.3 dev/prod rules). User remains in preview mode and may retry.
+- **`previewing` → `idle`:** User taps "Cancel". Calls `stopPreview()`.
+
+### 14.2 Zustand Store Additions
+
+Added to `src/store/useSessionStore.js`:
+
+```js
+// State
+previewMode: false,  // true while the user is previewing a bearing
+
+// Actions
+startPreview: () => set({ previewMode: true }),
+stopPreview:  () => set({ previewMode: false }),
+```
+
+`setActiveItem` clears both `deleteMode` and `previewMode` on item switch to avoid stale preview state carrying across items.
+
+### 14.3 Mapbox Preview Layers
+
+Two new GeoJSON sources and two new layers are added to `MapView.jsx`. They are initialized on map load (alongside the existing sources/layers) and updated via `useEffect` whenever `previewMode`, the live GPS position, or the live compass heading changes.
+
+**Sources:**
+
+- `preview-location`: GeoJSON FeatureCollection containing a single Point feature at the user's live `[lng, lat]`. Set to an empty FeatureCollection (`{ type: 'FeatureCollection', features: [] }`) when `previewMode` is false.
+- `preview-bearing-ray`: GeoJSON FeatureCollection containing a single LineString feature: a 500m ray from the user's GPS position along the live compass heading (same extent as saved bearing rays). Set to an empty FeatureCollection when `previewMode` is false.
+
+**Layers:**
+
+| Layer ID | Source | Type | Style |
+|---|---|---|---|
+| `preview-marker` | `preview-location` | circle | `circle-radius: 10`, `circle-color: '#22c55e'` (green-500), `circle-stroke-width: 3`, `circle-stroke-color: '#ffffff'` |
+| `preview-ray` | `preview-bearing-ray` | line | `line-color: '#f59e0b'` (amber-400), `line-width: 2`, `line-dasharray: [4, 3]` |
+
+**Layer ordering:** `preview-marker` and `preview-ray` are inserted above all saved data layers (`observer-points`, `bearing-rays`, `error-wedges`, `accuracy-rings`) but below `triangulation-point`. This is achieved by passing the `triangulation-point` layer ID as the `beforeId` argument to `map.addLayer()`.
+
+**Update logic (in `MapView.jsx`):**
+
+```js
+useEffect(() => {
+  if (!mapLoaded) return;
+
+  if (previewMode && lat != null && lng != null && bearing != null) {
+    const destination = destinationPoint([lng, lat], 0.5, bearing); // 500m along heading
+    map.getSource('preview-location').setData({
+      type: 'FeatureCollection',
+      features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [lng, lat] } }],
+    });
+    map.getSource('preview-bearing-ray').setData({
+      type: 'FeatureCollection',
+      features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates: [[lng, lat], destination] } }],
+    });
+  } else {
+    const empty = { type: 'FeatureCollection', features: [] };
+    map.getSource('preview-location').setData(empty);
+    map.getSource('preview-bearing-ray').setData(empty);
+  }
+}, [previewMode, lat, lng, bearing, mapLoaded]);
+```
+
+The `destinationPoint` helper computes the endpoint of a ray given a start coordinate, distance in km, and bearing in degrees. Implement using the haversine forward formula (same math used for bearing rays of saved data points).
+
+### 14.4 GPS/Compass Subscription Lifecycle
+
+No new subscriptions are required. The `useGeolocation()` and `useCompass()` hooks are already mounted in `Session.jsx` and run continuously while the session page is open. In preview mode, the live values they return (`lat`, `lng`, `bearing`) are passed as props to `MapView` and used to update the preview sources on each render cycle.
+
+Map auto-pan on entering preview mode:
+
+```js
+// In TrackButton or Session.jsx, when transitioning idle → previewing:
+if (lat != null && lng != null) {
+  map.easeTo({ center: [lng, lat], duration: 500 });
+}
+```
+
+### 14.5 Data Flow Summary
+
+| Step | Action | Firestore write? | Cloud Function triggered? |
+|---|---|---|---|
+| Tap "Start Bearing" | `previewMode: true`, map auto-pans | No | No |
+| Preview active | Live GPS + compass rendered on map | No | No |
+| Tap "Save Bearing" | `addDoc` to `dataPoints` sub-collection | Yes | Yes (onDocumentWritten) |
+| Save succeeds | `previewMode: false`, layers cleared | No | No |
+
+Preview is entirely client-side. No data is written to Firestore and no Cloud Function is invoked until the user explicitly taps "Save Bearing".
+
+### 14.6 Phase Task Ownership
+
+| Owner | Task | Notes |
+|---|---|---|
+| 🤖 AGENT | Update `TrackButton` with two-step state machine (§14.1): idle → previewing → saving → idle | Respects item locked state; Cancel button in preview |
+| 🤖 AGENT | Add `previewMode`, `startPreview`, `stopPreview` to Zustand store; update `setActiveItem` to clear `previewMode` | §14.2 |
+| 🤖 AGENT | Add `preview-location` and `preview-bearing-ray` sources + `preview-marker` and `preview-ray` layers to `MapView.jsx` | §14.3 |
+| 🤖 AGENT | Wire live GPS + compass values into MapView preview layer `useEffect` | §14.3; reuses existing `destinationPoint` helper |
+| 🤖 AGENT | Add map auto-pan on preview entry; trigger iOS permission on "Start Bearing" tap | §14.1, §14.4 |
+| 🤖 AGENT | Retain `CaptureOverlay` as manual-input fallback for devices without compass | §7.3; unchanged single-step flow |

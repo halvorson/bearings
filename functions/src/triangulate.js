@@ -4,12 +4,17 @@
  * computeTriangulation(points) — takes an array of data point objects with
  * fields: lat, lng, bearing (degrees, 0–360 clockwise from north), accuracy.
  *
- * Algorithm:
- *   Step 1  — Convert observer positions to local tangent plane (LTP)
- *   Step 2  — Convert bearings to unit direction vectors
- *   Step 3  — Least-squares ray intersection
- *   Step 4  — Confidence polygon via ±5° extreme rays + convex hull
- *   Step 5  — Insufficient spread check (early exit if range < 10°)
+ * Algorithm (v2 — IRLS):
+ *   Step 1  — Insufficient spread check (early exit if range < 10°)
+ *   Step 2  — Convert observer positions to local tangent plane (LTP)
+ *   Step 3  — Convert bearings to unit direction vectors
+ *   Step 4  — Iterative Reweighted Least Squares (IRLS):
+ *             a. Initial weights from GPS accuracy
+ *             b. Weighted least-squares ray intersection
+ *             c. Compute per-ray residuals
+ *             d. Huber reweighting (downweight outliers)
+ *             e. Repeat until convergence or max iterations
+ *   Step 5  — Confidence polygon via ±5° extreme rays + convex hull
  *   Step 6  — Low-confidence flag if estimate is > 2 km from observer centroid
  */
 
@@ -17,6 +22,9 @@ const EARTH_RADIUS = 6371000; // metres
 const MIN_SPREAD_DEG = 10;
 const LOW_CONFIDENCE_DIST_M = 2000;
 const BEARING_OFFSET_DEG = 5;
+const IRLS_MAX_ITER = 10;
+const IRLS_CONVERGENCE_M = 0.1;
+const HUBER_THRESHOLD_M = 50; // perpendicular residual beyond which downweighting begins
 
 // ---------------------------------------------------------------------------
 // Helper: degrees ↔ radians
@@ -127,28 +135,29 @@ function solve2x2(A, b) {
 }
 
 /**
- * Find the least-squares best-fit intersection of N rays.
- * Each ray: origin p_i, unit direction d_i.
+ * Find the weighted least-squares best-fit intersection of N rays.
+ * Each ray: origin p_i, unit direction d_i, weight w_i.
  *
  * Normal equation:
- *   A = Σ (I − d_i d_i^T)
- *   b = Σ (I − d_i d_i^T) p_i
+ *   A = Σ w_i (I − d_i d_i^T)
+ *   b = Σ w_i (I − d_i d_i^T) p_i
  *   P = A^{-1} b
  */
-function leastSquaresIntersection(origins, directions) {
+function weightedLeastSquaresIntersection(origins, directions, weights) {
   // Accumulate A (2×2) and b (2-vector)
   let a00 = 0, a01 = 0, a10 = 0, a11 = 0;
   let bx = 0, by = 0;
 
   for (let i = 0; i < origins.length; i++) {
+    const w = weights[i];
     const { x: px, y: py } = origins[i];
     const { x: dx, y: dy } = directions[i];
 
-    // M = (I − d d^T)
-    const m00 = 1 - dx * dx;
-    const m01 = -dx * dy;
-    const m10 = -dy * dx;
-    const m11 = 1 - dy * dy;
+    // M = w * (I − d d^T)
+    const m00 = w * (1 - dx * dx);
+    const m01 = w * (-dx * dy);
+    const m10 = w * (-dy * dx);
+    const m11 = w * (1 - dy * dy);
 
     a00 += m00;
     a01 += m01;
@@ -161,6 +170,69 @@ function leastSquaresIntersection(origins, directions) {
   }
 
   return solve2x2([a00, a01, a10, a11], [bx, by]);
+}
+
+/**
+ * Perpendicular distance from point P to ray (origin, direction).
+ * Uses 2D cross product: |( P - origin ) × direction|
+ */
+function perpendicularDistance(P, origin, direction) {
+  const vx = P.x - origin.x;
+  const vy = P.y - origin.y;
+  return Math.abs(vx * direction.y - vy * direction.x);
+}
+
+/**
+ * Huber weighting function.
+ * Returns 1.0 for residuals within threshold, k/|r| for larger residuals.
+ */
+function huberWeight(residual, k) {
+  if (residual <= k) return 1.0;
+  return k / residual;
+}
+
+/**
+ * IRLS: Iterative Reweighted Least Squares.
+ *
+ * Starts with GPS-accuracy-based weights, then iteratively downweights
+ * observations with large residuals using the Huber function.
+ *
+ * Returns { estimated, finalWeights } or { estimated: null } if degenerate.
+ */
+function irlsIntersection(origins, directions, accuracies) {
+  const n = origins.length;
+
+  // Initial weights from GPS accuracy: w = 1 / max(accuracy, 1)
+  const weights = accuracies.map((a) => 1 / Math.max(a ?? 1, 1));
+
+  let estimated = weightedLeastSquaresIntersection(origins, directions, weights);
+  if (estimated === null) return { estimated: null, finalWeights: weights };
+
+  // With 2–3 points, IRLS can amplify bias (initial estimate is too imprecise
+  // to reliably identify outliers). Use GPS-accuracy weighting only.
+  if (n <= 3) return { estimated, finalWeights: weights };
+
+  for (let iter = 0; iter < IRLS_MAX_ITER; iter++) {
+    // Compute residuals and reweight
+    for (let i = 0; i < n; i++) {
+      const r = perpendicularDistance(estimated, origins[i], directions[i]);
+      const priorWeight = 1 / Math.max(accuracies[i] ?? 1, 1);
+      weights[i] = priorWeight * huberWeight(r, HUBER_THRESHOLD_M);
+    }
+
+    const newEstimated = weightedLeastSquaresIntersection(origins, directions, weights);
+    if (newEstimated === null) break; // degenerate — keep previous estimate
+
+    // Convergence check
+    const dx = newEstimated.x - estimated.x;
+    const dy = newEstimated.y - estimated.y;
+    const movement = Math.sqrt(dx * dx + dy * dy);
+
+    estimated = newEstimated;
+    if (movement < IRLS_CONVERGENCE_M) break;
+  }
+
+  return { estimated, finalWeights: weights };
 }
 
 // ---------------------------------------------------------------------------
@@ -242,31 +314,32 @@ function convexHull(points) {
 /**
  * Build the confidence polygon.
  *
- * For each of the N data points, produce two extreme rays at bearing ± 5°.
+ * For each of the N data points (that weren't heavily downweighted),
+ * produce two extreme rays at bearing ± 5°.
  * Intersect all pairs of extreme rays from different observers.
  * Return the convex hull as a closed GeoJSON Polygon ring.
  */
-function buildConfidencePolygon(points2d, bearings, lat0, lng0, lat0Rad) {
+function buildConfidencePolygon(points2d, bearings, lat0, lng0, lat0Rad, weights) {
   const n = points2d.length;
+  const MIN_WEIGHT = 0.1;
 
   // Collect extreme ray origins and directions (2 per point: bearing ± 5°)
+  // Exclude points with very low weight (treated as outliers)
   const extremeRays = [];
   for (let i = 0; i < n; i++) {
+    if (weights && weights[i] < MIN_WEIGHT) continue;
     const bLow = bearings[i] - BEARING_OFFSET_DEG;
     const bHigh = bearings[i] + BEARING_OFFSET_DEG;
-    extremeRays.push({ origin: points2d[i], dir: bearingToDirection(bLow) });
-    extremeRays.push({ origin: points2d[i], dir: bearingToDirection(bHigh) });
+    extremeRays.push({ origin: points2d[i], dir: bearingToDirection(bLow), obsIdx: i });
+    extremeRays.push({ origin: points2d[i], dir: bearingToDirection(bHigh), obsIdx: i });
   }
 
   // Find all pairwise intersections between rays from different original points
   const intersections = [];
   for (let i = 0; i < extremeRays.length; i++) {
     for (let j = i + 1; j < extremeRays.length; j++) {
-      // Rays from the same original observer share the same origin index
-      // (ray 2k and 2k+1 come from point k). Skip if same observer.
-      const iObs = Math.floor(i / 2);
-      const jObs = Math.floor(j / 2);
-      if (iObs === jObs) continue;
+      // Skip if same observer
+      if (extremeRays[i].obsIdx === extremeRays[j].obsIdx) continue;
 
       const pt = rayRayIntersection(
         extremeRays[i].origin,
@@ -346,16 +419,17 @@ function computeTriangulation(points) {
 
   // --- Step 2: Bearing to direction vectors ---
   const directions = bearings.map(bearingToDirection);
+  const accuracies = points.map((p) => p.accuracy);
 
-  // --- Step 3: Least-squares intersection ---
-  const estimated = leastSquaresIntersection(points2d, directions);
+  // --- Step 3: IRLS intersection ---
+  const { estimated, finalWeights } = irlsIntersection(points2d, directions, accuracies);
   if (estimated === null) {
     // Degenerate — treat as insufficient spread
     return { dataPointCount: n, insufficientSpread: true, lowConfidence: false };
   }
 
-  // --- Step 4: Confidence polygon ---
-  const confidencePolygon = buildConfidencePolygon(points2d, bearings, lat0, lng0, lat0Rad);
+  // --- Step 4: Confidence polygon (excludes heavily downweighted points) ---
+  const confidencePolygon = buildConfidencePolygon(points2d, bearings, lat0, lng0, lat0Rad, finalWeights);
 
   // --- Convert estimated point back to lat/lng ---
   const { lat: estimatedLat, lng: estimatedLng } = ltpToLatLng(

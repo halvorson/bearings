@@ -1,0 +1,32 @@
+{
+  "name": "Sutro Tower",
+  "knownLocation": {
+    "lat": 37.7552,
+    "lng": -122.4528,
+    "source": "latitude.to, Wikipedia",
+    "description": "Sutro Tower, broadcast antenna tower on Mount Sutro, San Francisco"
+  },
+  "notes": "Only 2 observations with 8.8 degree angular spread — fails the current 10 degree minimum spread threshold. Both observations were taken from vantage points at similar azimuths relative to the target. Needs wider-spread data to produce an estimate.",
+  "dataPoints": [
+    {
+      "id": "26WGlOOsCsHnnm3qTwyu",
+      "lat": 37.826977771394965,
+      "lng": -122.499164141595,
+      "bearing": 138.55270385742188,
+      "accuracy": 4.29316309560423,
+      "participantToken": "76c8c492-88f1-49ea-90e3-6d566e0273f4",
+      "timestamp": "2026-03-15T23:48:09.094Z",
+      "vantagePoint": "Battery Spencer area"
+    },
+    {
+      "id": "vgK2bxXzyb5lQ5aLmCF9",
+      "lat": 37.82410969385083,
+      "lng": -122.52738936967157,
+      "bearing": 129.72857666015625,
+      "accuracy": 4.748651530191762,
+      "participantToken": "76c8c492-88f1-49ea-90e3-6d566e0273f4",
+      "timestamp": "2026-03-15T23:57:49.666Z",
+      "vantagePoint": "Coastal Trail area"
+    }
+  ]
+}

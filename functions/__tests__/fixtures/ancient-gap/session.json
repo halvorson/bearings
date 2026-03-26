@@ -1,0 +1,24 @@
+{
+  "sessionId": "fruDQ9CF",
+  "name": "Ancient Gap",
+  "source": "bearings-app-dev Firestore",
+  "collectedDate": "2026-03-15 to 2026-03-17",
+  "collector": "Michael Halvorson",
+  "location": "San Francisco Bay Area — Marin Headlands, Baker Beach, Lands End",
+  "items": [
+    { "file": "n-tower-ggb.json", "name": "N Tower GGB", "points": 3 },
+    { "file": "s-tower-ggb.json", "name": "S Tower GGB", "points": 5 },
+    { "file": "sutro-tower.json", "name": "Sutro Tower", "points": 2 },
+    { "file": "pt-bonita-lighthouse.json", "name": "Pt Bonita Lighthouse", "points": 3 }
+  ],
+  "baselineResults": {
+    "algorithm": "least-squares ray intersection (v0.2)",
+    "date": "2026-03-25",
+    "results": {
+      "N Tower GGB": { "error_m": 744, "lowConfidence": true, "insufficientSpread": false },
+      "S Tower GGB": { "error_m": 356, "lowConfidence": false, "insufficientSpread": false },
+      "Sutro Tower": { "error_m": null, "lowConfidence": false, "insufficientSpread": true },
+      "Pt Bonita Lighthouse": { "error_m": 761, "lowConfidence": false, "insufficientSpread": false }
+    }
+  }
+}

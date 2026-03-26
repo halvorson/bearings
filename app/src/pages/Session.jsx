@@ -34,8 +34,9 @@ export default function Session({ id }) {
   const { dataPoints } = useDataPoints(id, activeItemId);
 
   const activeItem = items.find((i) => i.id === activeItemId) ?? null;
+  const previewMode = useSessionStore((s) => s.previewMode);
   const { bearing, supported: compassSupported, calibrationQuality, permissionState } = useCompass();
-  const { accuracy, error: gpsError } = useGeolocation();
+  const { lat: gpsLat, lng: gpsLng, accuracy, error: gpsError } = useGeolocation();
 
   // Fire session_joined once when session loads
   useEffect(() => {
@@ -109,7 +110,14 @@ export default function Session({ id }) {
       {/* ── Map card ── */}
       <div className="flex-1 min-h-0 px-3 py-2">
         <div className="relative w-full h-full rounded-xl overflow-hidden ring-1 ring-white/10">
-          <MapView sessionId={id} itemId={activeItemId} />
+          <MapView
+            sessionId={id}
+            itemId={activeItemId}
+            previewMode={previewMode}
+            previewLat={gpsLat}
+            previewLng={gpsLng}
+            previewBearing={bearing}
+          />
 
           {/* Delete mode banner */}
           {deleteMode && (
@@ -152,7 +160,7 @@ export default function Session({ id }) {
               </>
             ) : (
               <span className="text-sm text-gray-500">
-                {compassSupported ? 'Tap Record to capture a bearing' : 'No compass — manual input'}
+                {compassSupported ? 'Tap Start Bearing to begin' : 'No compass — manual input'}
               </span>
             )}
           </div>

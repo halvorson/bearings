@@ -1,0 +1,62 @@
+{
+  "name": "S Tower GGB",
+  "knownLocation": {
+    "lat": 37.814059454854515,
+    "lng": -122.47788705223233,
+    "source": "Google Maps satellite imagery",
+    "description": "South tower (San Francisco side) of the Golden Gate Bridge"
+  },
+  "notes": "5 observations from diverse vantage points with the widest angular spread. Best current accuracy (356m). Good candidate for testing whether algorithm improvements can push below 100m.",
+  "dataPoints": [
+    {
+      "id": "2ZYWS825g1LzYrFKXNvl",
+      "lat": 37.8070059175949,
+      "lng": -122.47245773818342,
+      "bearing": 315.41265869140625,
+      "accuracy": 4.748651530191762,
+      "participantToken": "76c8c492-88f1-49ea-90e3-6d566e0273f4",
+      "timestamp": "2026-03-17T01:41:40.640Z",
+      "vantagePoint": "Hawk Hill area"
+    },
+    {
+      "id": "R9Qq9fbCQwMvOQVp8luK",
+      "lat": 37.826978809244316,
+      "lng": -122.49917590935753,
+      "bearing": 101.28266906738281,
+      "accuracy": 6.16133448169341,
+      "participantToken": "76c8c492-88f1-49ea-90e3-6d566e0273f4",
+      "timestamp": "2026-03-15T23:46:15.195Z",
+      "vantagePoint": "Battery Spencer area"
+    },
+    {
+      "id": "XrAKaQyDjaFKwY469rMW",
+      "lat": 37.80625283705569,
+      "lng": -122.45493258839372,
+      "bearing": 285.409423828125,
+      "accuracy": 4.443235172697603,
+      "participantToken": "76c8c492-88f1-49ea-90e3-6d566e0273f4",
+      "timestamp": "2026-03-17T22:57:55.875Z",
+      "vantagePoint": "Lands End trail area"
+    },
+    {
+      "id": "yuPD2cmWNhmrhnr2nFsJ",
+      "lat": 37.80041265989814,
+      "lng": -122.47824105785354,
+      "bearing": 8.905256271362305,
+      "accuracy": 3.1133771787241575,
+      "participantToken": "76c8c492-88f1-49ea-90e3-6d566e0273f4",
+      "timestamp": "2026-03-16T00:36:58.410Z",
+      "vantagePoint": "Baker Beach area"
+    },
+    {
+      "id": "zrG6pdzf9cz968G3GIJn",
+      "lat": 37.824107437339514,
+      "lng": -122.52738450926171,
+      "bearing": 96.66275024414062,
+      "accuracy": 4.748651530191761,
+      "participantToken": "76c8c492-88f1-49ea-90e3-6d566e0273f4",
+      "timestamp": "2026-03-15T23:57:55.277Z",
+      "vantagePoint": "Coastal Trail area"
+    }
+  ]
+}

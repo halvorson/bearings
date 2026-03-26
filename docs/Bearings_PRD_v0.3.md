@@ -4,7 +4,7 @@
 | | |
 |---|---|
 | **Status** | Ready for Engineering — All decisions resolved |
-| **Last Updated** | March 15, 2026 |
+| **Last Updated** | March 25, 2026 |
 | **Tech Stack** | React (Vite) · Firebase Hosting + Firestore + Cloud Functions · Mapbox GL JS · Google Analytics 4 |
 | **Primary Use Case** | Collaborative, GPS + compass-based triangulation of sound sources in the field |
 
@@ -23,6 +23,7 @@
 | 7 | Mapbox default style? | Streets only |
 | 8 | Participant presence? | Deferred to v2 |
 | 9 | Item reordering? | Deferred to v2 |
+| 10 | Capture flow for v0.3.0? | Two-step: "Start Bearing" → live preview on map → "Save Bearing." Triangulation recalculates only on save. |
 
 ---
 
@@ -44,7 +45,19 @@ When naturalists, birders, or researchers hear a sound source but cannot see it,
 - Operate without accounts or authentication — access is controlled by link obscurity only.
 - Display all data on a live-updating Mapbox (streets style) map.
 
-### 1.3 Non-Goals
+### 1.3 Feature Highlights
+
+| Feature | Version | Description |
+|---|---|---|
+| Collaborative sessions | v0.1 | Shareable session URL, no auth, real-time Firestore sync |
+| GPS + compass capture | v0.1 | Record observer position and compass bearing per data point |
+| Triangulation & confidence polygon | v0.1 | Cloud Function computes estimated item location from ≥2 bearing rays |
+| Multiple items per session | v0.1 | Switch between named items; triangulation independent per item |
+| Delete mode | v0.2 | Tap-to-delete own data points from item settings panel |
+| Home screen & recent sessions | v0.2 | Session list from localStorage, start or rejoin sessions |
+| Live Bearing Preview | v0.3.0 | Two-step capture flow: "Start Bearing" shows a live GPS marker + bearing ray on the map before "Save Bearing" commits the reading. Triangulation recalculates only on save. |
+
+### 1.4 Non-Goals
 
 - User authentication or authorization.
 - Offline / service-worker data sync (v2).
@@ -129,15 +142,49 @@ Given two or more data points, the system computes the most likely item location
 3. If the participant has no localStorage token, one is generated and stored.
 4. Live map is displayed with all existing data points and the current triangulation result.
 
-### 4.3 Recording a Data Point
+### 4.3 Recording a Data Point (v0.3.0 — Live Bearing Preview)
 
-1. Participant hears the item and physically points their phone at the sound source direction.
-2. Taps "Record." (Disabled if the item is locked or has reached 10 data points.)
-3. App captures GPS position (Geolocation API, high-accuracy mode) and compass heading (DeviceOrientationEvent absolute).
-4. If the device does not support absolute orientation, a manual bearing entry input is shown as fallback.
-5. Data point is written to Firestore under the active item.
-6. Cloud Function triggers, recomputes triangulation, writes result.
-7. Map on all connected clients updates within ~2s (data point) and ~5s (triangulation result).
+The capture flow uses a two-step "Start Bearing" → "Save Bearing" interaction that shows a real-time bearing preview on the map before committing a reading.
+
+**Idle state**
+
+- The CTA reads "Start Bearing" (amber).
+- Disabled if the item is locked or has reached 10 data points.
+
+**Previewing state** (entered on "Start Bearing" tap)
+
+1. The app begins acquiring GPS position (Geolocation API, high-accuracy mode) and reading the compass heading (DeviceOrientationEvent absolute) continuously.
+2. A live GPS marker and a bearing ray are rendered on the map, updating in real time as the device moves or rotates.
+3. Preview visuals are visually distinct from saved data points (different color / style) so participants can distinguish unsaved from committed readings.
+4. The CTA changes to "Save Bearing" (green). A "Cancel" option is available alongside it.
+5. Triangulation is not recalculated during the preview — it only recalculates after a save.
+6. If the device does not support absolute orientation, the manual bearing entry overlay is shown as fallback (unchanged from v0.2).
+
+**Save**
+
+1. Participant taps "Save Bearing."
+2. The current GPS position and compass heading are written to Firestore as a data point under the active item.
+3. The preview visuals are removed from the map and replaced by the persisted data point marker.
+4. The Cloud Function triggers, recomputes triangulation, and writes the result.
+5. The UI returns to idle ("Start Bearing").
+6. Map on all connected clients updates within ~2s (data point) and ~5s (triangulation result).
+
+**Cancel**
+
+1. Participant taps "Cancel."
+2. The preview visuals are cleared from the map.
+3. No data is written. The UI returns to idle ("Start Bearing").
+
+#### Acceptance Criteria
+
+- [ ] Live GPS marker appears on the map immediately upon entering previewing state.
+- [ ] Bearing ray updates in real time as the device rotates during preview.
+- [ ] Preview marker and ray are visually distinct (different color/style) from saved data point markers.
+- [ ] Cancelling preview removes all preview visuals and returns UI to idle without writing any data.
+- [ ] Triangulation pin and confidence polygon do not change during preview; they only update after a save.
+- [ ] Manual capture overlay fallback is unchanged for devices without compass support.
+- [ ] "Start Bearing" CTA is amber; "Save Bearing" CTA is green.
+- [ ] Save and Cancel tap targets meet the ≥44 × 44px minimum.
 
 ### 4.4 Deleting a Data Point
 
@@ -181,6 +228,8 @@ Mapbox GL JS. Default style: streets (`mapbox://styles/mapbox/streets-v12`). The
 | Confidence polygon | Convex hull of intersection region accounting for bearing error. Semi-transparent fill. | Function result |
 | Confidence polygon outline | Dashed red outline around the confidence polygon for visibility. | Function result |
 | GPS accuracy ring | Circle around each observer point reflecting GPS accuracy in meters. | Firestore real-time |
+| **Preview GPS marker** | Live marker at the device's current GPS position, shown only during the "previewing" capture state. Distinct style (e.g. pulsing amber) to differentiate from saved points. | Device Geolocation API (live) |
+| **Preview bearing ray** | Live ray from the preview GPS marker in the current compass heading direction, clipped at 500m. Updates continuously as the device rotates. Distinct style (e.g. dashed amber) to differentiate from saved rays. | DeviceOrientationEvent (live) |
 
 The map auto-zooms to fit all data points and the triangulation estimate when the active item changes.
 
@@ -366,8 +415,9 @@ File: `.github/workflows/deploy-prod.yml`
 | Screen | Purpose | Primary CTA |
 |---|---|---|
 | Home | Entry. Start or (future) resume a session. | Start New Session |
-| Session / Map | Live map, item tabs, share link, Record button. Includes delete mode banner when active. | Record |
-| Capture overlay | Compass rose + GPS status. Confirm the bearing before writing. | Confirm |
+| Session / Map (idle) | Live map, item tabs, share link. CTA is "Start Bearing" (amber). Includes delete mode banner when active. | Start Bearing |
+| Session / Map (previewing) | Live preview GPS marker + bearing ray on map. CTA is "Save Bearing" (green); "Cancel" adjacent. | Save Bearing |
+| Capture overlay (fallback) | Manual bearing input for devices without compass. Confirm the bearing before writing. | Confirm |
 | Item settings | Rename or lock an item inline. Includes delete mode toggle (trash icon). | Save / Lock |
 | Session header | Session name (editable), share link copy. | — |
 
@@ -401,6 +451,8 @@ Google Analytics 4 (gtag.js). Key custom events:
 | `item_created` | item_index |
 | `item_renamed` | — |
 | `item_locked` | locked: bool |
+| `bearing_preview_started` | item_id |
+| `bearing_preview_cancelled` | item_id |
 | `data_point_recorded` | item_id, point_count_after, gps_accuracy_m |
 | `data_point_deleted` | item_id, point_count_after |
 | `triangulation_computed` | point_count, insufficient_spread: bool |

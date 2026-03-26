@@ -1,0 +1,42 @@
+{
+  "name": "Pt Bonita Lighthouse",
+  "knownLocation": {
+    "lat": 37.8155,
+    "lng": -122.5297,
+    "source": "lighthousefriends.com, NPS",
+    "description": "Point Bonita Lighthouse, Marin Headlands, Golden Gate National Recreation Area"
+  },
+  "notes": "3 observations from different vantage points. Reasonable angular spread. Current error is 761m.",
+  "dataPoints": [
+    {
+      "id": "9HwF3WGYLi9ygMxiqo4t",
+      "lat": 37.80039886509822,
+      "lng": -122.4782136767297,
+      "bearing": 302.61065673828125,
+      "accuracy": 6.169549415750551,
+      "participantToken": "76c8c492-88f1-49ea-90e3-6d566e0273f4",
+      "timestamp": "2026-03-16T00:37:41.218Z",
+      "vantagePoint": "Baker Beach area"
+    },
+    {
+      "id": "A5N8kmFOfvaGhZaLwT8D",
+      "lat": 37.82720537562759,
+      "lng": -122.50209701195439,
+      "bearing": 228.08985900878906,
+      "accuracy": 2.389830631693772,
+      "participantToken": "76c8c492-88f1-49ea-90e3-6d566e0273f4",
+      "timestamp": "2026-03-15T23:51:44.853Z",
+      "vantagePoint": "Battery Spencer area"
+    },
+    {
+      "id": "dn0LzhXYK0qEH8XPrgG8",
+      "lat": 37.824111592503144,
+      "lng": -122.5273985709097,
+      "bearing": 181.1475067138672,
+      "accuracy": 5.882996718040694,
+      "participantToken": "76c8c492-88f1-49ea-90e3-6d566e0273f4",
+      "timestamp": "2026-03-15T23:58:33.501Z",
+      "vantagePoint": "Coastal Trail area"
+    }
+  ]
+}
