@@ -1,0 +1,50 @@
+{
+  "name": "N Tower GGB",
+  "knownLocation": {
+    "lat": 37.82547835516429,
+    "lng": -122.47897218629134,
+    "source": "Google Maps satellite imagery",
+    "description": "North tower (Marin side) of the Golden Gate Bridge"
+  },
+  "notes": "5 observations from different vantage points. Battery Spencer reading near metal railing (bearing 54.9) shows +40° error — strong magnetic interference. IRLS downweights it.",
+  "dataPoints": [
+    {
+      "id": "1j9oFnJpLTKkCYajrXqh",
+      "lat": 37.807003794959115,
+      "lng": -122.47246218868105,
+      "bearing": 331.8048095703125,
+      "accuracy": 4.748651530191761,
+      "vantagePoint": "Hawk Hill overlook area"
+    },
+    {
+      "id": "W3E2KqZpMFP5Fawywr1N",
+      "lat": 37.800414615665495,
+      "lng": -122.47823770796029,
+      "bearing": 6.9012274742126465,
+      "accuracy": 4.748651530191761,
+      "vantagePoint": "Baker Beach area"
+    },
+    {
+      "id": "g8Mbcrv80vDGCoiBkZ9R",
+      "lat": 37.826963751513844,
+      "lng": -122.49917055980461,
+      "bearing": 54.9205322265625,
+      "accuracy": 4.210217522099167,
+      "vantagePoint": "Battery Spencer area (near metal railing — magnetic interference)"
+    },
+    {
+      "lat": 37.829855308826446,
+      "lng": -122.48329337601332,
+      "bearing": 132.2901611328125,
+      "accuracy": 5.9565323734662909,
+      "vantagePoint": "Marin Headlands (added 2026-04)"
+    },
+    {
+      "lat": 37.805462601189589,
+      "lng": -122.43021774007404,
+      "bearing": 287.97674560546875,
+      "accuracy": 4.9666847898319526,
+      "vantagePoint": "Presidio/Crissy Field area (added 2026-04)"
+    }
+  ]
+}

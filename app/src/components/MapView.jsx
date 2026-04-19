@@ -98,6 +98,8 @@ const SOURCES = [
   'triangulation-point',
   'confidence-polygon',
   'accuracy-rings',
+  'preview-location',
+  'preview-bearing-ray',
 ];
 
 function addSourcesAndLayers(map) {
@@ -133,14 +135,15 @@ function addSourcesAndLayers(map) {
     },
   });
 
-  // confidence-polygon fill
+  // confidence-polygon fill (now rendered as a residual-covariance error
+  // ellipse from the Cloud Function for n >= 3; wedge-hull fallback for n = 2)
   map.addLayer({
     id: 'confidence-polygon',
     type: 'fill',
     source: 'confidence-polygon',
     paint: {
       'fill-color': '#EF4444',
-      'fill-opacity': 0.2,
+      'fill-opacity': 0.08,
     },
   });
 
@@ -151,8 +154,8 @@ function addSourcesAndLayers(map) {
     source: 'confidence-polygon',
     paint: {
       'line-color': '#EF4444',
-      'line-width': 2,
-      'line-opacity': 0.6,
+      'line-width': 1.5,
+      'line-opacity': 0.4,
       'line-dasharray': [4, 2],
     },
   });
@@ -166,6 +169,32 @@ function addSourcesAndLayers(map) {
       'line-width': 2,
       'line-color': '#3B82F6',
       'line-opacity': 0.7,
+    },
+  });
+
+  // preview-bearing-ray — dashed amber line for live heading
+  map.addLayer({
+    id: 'preview-ray',
+    type: 'line',
+    source: 'preview-bearing-ray',
+    paint: {
+      'line-width': 2.5,
+      'line-color': '#FBBF24',
+      'line-opacity': 0.9,
+      'line-dasharray': [6, 3],
+    },
+  });
+
+  // preview-marker — green dot for live GPS position
+  map.addLayer({
+    id: 'preview-marker',
+    type: 'circle',
+    source: 'preview-location',
+    paint: {
+      'circle-radius': 8,
+      'circle-color': '#22C55E',
+      'circle-stroke-width': 3,
+      'circle-stroke-color': '#ffffff',
     },
   });
 
@@ -212,7 +241,7 @@ function addSourcesAndLayers(map) {
 // MapView
 // ---------------------------------------------------------------------------
 
-export default function MapView({ sessionId, itemId }) {
+export default function MapView({ sessionId, itemId, previewMode, previewLat, previewLng, previewBearing }) {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const initialCenteredRef = useRef(false);
@@ -430,6 +459,84 @@ export default function MapView({ sessionId, itemId }) {
       });
     }
   }, [dataPoints, result, styleLoaded]);
+
+  // Update preview layers with live GPS + compass data
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !styleLoaded) return;
+
+    const empty = { type: 'FeatureCollection', features: [] };
+
+    if (!previewMode || previewLat == null || previewLng == null) {
+      map.getSource('preview-location')?.setData(empty);
+      map.getSource('preview-bearing-ray')?.setData(empty);
+      return;
+    }
+
+    // Live position marker
+    map.getSource('preview-location')?.setData({
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [previewLng, previewLat] },
+        properties: {},
+      }],
+    });
+
+    // Live bearing ray
+    if (previewBearing != null) {
+      const dest = destinationPoint(previewLat, previewLng, previewBearing, 500);
+      map.getSource('preview-bearing-ray')?.setData({
+        type: 'FeatureCollection',
+        features: [{
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: [[previewLng, previewLat], [dest.lng, dest.lat]],
+          },
+          properties: {},
+        }],
+      });
+    } else {
+      map.getSource('preview-bearing-ray')?.setData(empty);
+    }
+  }, [previewMode, previewLat, previewLng, previewBearing, styleLoaded]);
+
+  // Fit map to include everything when entering preview mode:
+  // existing data points, triangulation estimate, user location, and preview ray tip
+  const prevPreviewRef = useRef(false);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (previewMode && !prevPreviewRef.current && previewLat != null && previewLng != null) {
+      const bounds = new mapboxgl.LngLatBounds();
+
+      // Include existing data points
+      (dataPoints ?? []).forEach((dp) => bounds.extend([dp.lng, dp.lat]));
+
+      // Include triangulation estimate
+      if (result?.estimatedLat != null && result?.estimatedLng != null) {
+        bounds.extend([result.estimatedLng, result.estimatedLat]);
+      }
+
+      // Include user's current position
+      bounds.extend([previewLng, previewLat]);
+
+      // Include the preview ray endpoint
+      if (previewBearing != null) {
+        const dest = destinationPoint(previewLat, previewLng, previewBearing, 500);
+        bounds.extend([dest.lng, dest.lat]);
+      }
+
+      if (bounds.isEmpty()) {
+        map.flyTo({ center: [previewLng, previewLat], zoom: 17, duration: 800 });
+      } else {
+        map.fitBounds(bounds, { padding: 60, maxZoom: 18, duration: 800 });
+      }
+    }
+    prevPreviewRef.current = previewMode;
+  }, [previewMode, previewLat, previewLng, previewBearing, dataPoints, result]);
 
   return <div ref={mapContainerRef} className="w-full h-full" />;
 }

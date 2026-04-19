@@ -22,8 +22,8 @@ export default function CaptureOverlay({ sessionId }) {
   const activeItemId = useSessionStore((s) => s.activeItemId);
   const participantToken = useSessionStore((s) => s.participantToken);
 
-  const { bearing, supported: compassSupported, calibrationQuality } = useCompass();
   const { lat, lng, accuracy, error: gpsError } = useGeolocation();
+  const { bearing, supported: compassSupported, calibrationQuality } = useCompass({ lat, lng });
 
   const [manualBearing, setManualBearing] = useState(null);
   const [submitting, setSubmitting] = useState(false);

@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { track } from '../lib/analytics';
+import { saveRecentSession } from '../lib/recentSessions';
 
 /**
  * Compact session header for the instrument panel — dark themed.
@@ -11,6 +13,7 @@ export default function SessionHeader({ sessionId, session }) {
   const [editingName, setEditingName] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const inputRef = useRef(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!isEditing && session?.name) {
@@ -23,6 +26,12 @@ export default function SessionHeader({ sessionId, session }) {
       document.title = `${session.name} — Bearings`;
     }
   }, [session?.name]);
+
+  useEffect(() => {
+    if (sessionId && session?.name) {
+      saveRecentSession({ id: sessionId, name: session.name });
+    }
+  }, [sessionId, session?.name]);
 
   const handleFocus = () => {
     setIsEditing(true);
@@ -72,6 +81,30 @@ export default function SessionHeader({ sessionId, session }) {
       <span className="absolute top-1 right-14 text-[9px] text-gray-700 font-mono select-none pointer-events-none">
         v{__APP_VERSION__}
       </span>
+
+      <button
+        onClick={() => navigate('/')}
+        aria-label="Back to home"
+        className="flex-none flex items-center justify-center w-11 h-11 rounded-full
+                   text-gray-500 hover:text-amber-400 hover:bg-gray-800
+                   active:bg-gray-700 transition-colors"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="w-5 h-5"
+          aria-hidden="true"
+        >
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
+        </svg>
+      </button>
+
       <input
         ref={inputRef}
         type="text"

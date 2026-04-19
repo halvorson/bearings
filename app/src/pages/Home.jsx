@@ -5,6 +5,7 @@ import { db } from '../lib/firebase';
 import { generateName } from '../lib/words';
 import { track } from '../lib/analytics';
 import useSessionStore from '../store/useSessionStore';
+import { getRecentSessions, removeRecentSession } from '../lib/recentSessions';
 
 const NANOID_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-';
 
@@ -16,9 +17,22 @@ function generateId(length = 8) {
     .join('');
 }
 
+function timeAgo(timestamp) {
+  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return `${Math.floor(days / 30)}mo ago`;
+}
+
 export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [recentSessions, setRecentSessions] = useState(() => getRecentSessions());
   const navigate = useNavigate();
   const participantToken = useSessionStore((s) => s.participantToken);
 
@@ -61,7 +75,7 @@ export default function Home() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center h-full bg-gray-950 p-4">
+    <div className="flex flex-col items-center justify-center min-h-full bg-gray-950 p-4 overflow-y-auto">
       <div className="max-w-sm w-full text-center">
         <h1 className="text-3xl font-bold text-gray-100 mb-2">Bearings</h1>
         <p className="text-gray-500 mb-8">Collaborative GPS + compass triangulation</p>
@@ -111,6 +125,45 @@ export default function Home() {
             'Start New Session'
           )}
         </button>
+
+        {recentSessions.length > 0 && (
+          <div className="mt-10 w-full text-left">
+            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">
+              Jump Back In
+            </h2>
+            <ul className="space-y-1">
+              {recentSessions.map((s) => (
+                <li key={s.id} className="group flex items-center gap-2">
+                  <button
+                    onClick={() => navigate(`/?s=${s.id}`)}
+                    className="flex-1 min-w-0 flex items-center justify-between min-h-[44px]
+                               px-3 py-2 rounded-lg text-left
+                               hover:bg-gray-800 active:bg-gray-700 transition-colors"
+                  >
+                    <span className="text-sm text-gray-200 truncate">{s.name}</span>
+                    <span className="text-xs text-gray-600 flex-none ml-3">
+                      {timeAgo(s.lastVisited)}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      removeRecentSession(s.id);
+                      setRecentSessions(getRecentSessions());
+                    }}
+                    aria-label={`Remove ${s.name} from recent sessions`}
+                    className="flex-none w-8 h-8 flex items-center justify-center rounded-full
+                               text-gray-700 hover:text-red-400 hover:bg-gray-800
+                               sm:opacity-0 sm:group-hover:opacity-100 transition-all"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                      <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                    </svg>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );

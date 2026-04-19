@@ -1,0 +1,48 @@
+{
+  "name": "Sutro Tower",
+  "knownLocation": {
+    "lat": 37.7552,
+    "lng": -122.4528,
+    "source": "latitude.to, Wikipedia",
+    "description": "Sutro Tower, broadcast antenna tower on Mount Sutro, San Francisco"
+  },
+  "notes": "5 observations with good angular spread after additional collection in April. Best convergence of any item: 73m error with 5 clean observations.",
+  "dataPoints": [
+    {
+      "id": "vgK2bxXzyb5lQ5aLmCF9",
+      "lat": 37.824109693850829,
+      "lng": -122.52738936967157,
+      "bearing": 129.72857666015625,
+      "accuracy": 4.7486515301917622,
+      "vantagePoint": "Coastal Trail area"
+    },
+    {
+      "lat": 37.784580353695056,
+      "lng": -122.4502003422633,
+      "bearing": 172.07489013671875,
+      "accuracy": 4.8122410418191643,
+      "vantagePoint": "Twin Peaks area (added 2026-04)"
+    },
+    {
+      "lat": 37.77090814579303,
+      "lng": -122.45548190539751,
+      "bearing": 165.35845947265625,
+      "accuracy": 7.199440424319631,
+      "vantagePoint": "Corona Heights area (added 2026-04)"
+    },
+    {
+      "lat": 37.760752728627018,
+      "lng": -122.4267078359202,
+      "bearing": 242.434326171875,
+      "accuracy": 4.7486515301917613,
+      "vantagePoint": "Mission/Bernal area (added 2026-04)"
+    },
+    {
+      "lat": 37.757619930314959,
+      "lng": -122.40036978046906,
+      "bearing": 258.04156494140625,
+      "accuracy": 5.8696168391362651,
+      "vantagePoint": "Potrero Hill area (added 2026-04)"
+    }
+  ]
+}

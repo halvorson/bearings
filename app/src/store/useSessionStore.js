@@ -16,11 +16,14 @@ const useSessionStore = create((set) => ({
   participantToken: getOrCreateToken(),
   captureOverlayOpen: false,
   deleteMode: false,
+  previewMode: false,
 
-  setActiveItem: (id) => set({ activeItemId: id, deleteMode: false }),
+  setActiveItem: (id) => set({ activeItemId: id, deleteMode: false, previewMode: false }),
   openCapture: () => set({ captureOverlayOpen: true }),
   closeCapture: () => set({ captureOverlayOpen: false }),
   setDeleteMode: (on) => set({ deleteMode: on }),
+  startPreview: () => set({ previewMode: true, deleteMode: false }),
+  stopPreview: () => set({ previewMode: false }),
 }));
 
 export default useSessionStore;

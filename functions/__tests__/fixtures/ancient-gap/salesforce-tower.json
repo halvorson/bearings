@@ -1,0 +1,40 @@
+{
+  "name": "Salesforce Tower",
+  "knownLocation": {
+    "lat": 37.78986287257681,
+    "lng": -122.39722297466544,
+    "source": "Google Maps",
+    "description": "Salesforce Tower, downtown San Francisco"
+  },
+  "notes": "4 observations including two near-duplicate readings from Treasure Island. Hardest item by current results (563m CV error) due to limited baseline diversity.",
+  "dataPoints": [
+    {
+      "lat": 37.816668132021633,
+      "lng": -122.37218496875852,
+      "bearing": 210.28285217285156,
+      "accuracy": 5.88526573907736,
+      "vantagePoint": "Treasure Island (reading 1)"
+    },
+    {
+      "lat": 37.7576463579453,
+      "lng": -122.40021267014518,
+      "bearing": 352.66336059570312,
+      "accuracy": 14.24595459057527,
+      "vantagePoint": "Potrero Hill area"
+    },
+    {
+      "lat": 37.760752728627018,
+      "lng": -122.4267078359202,
+      "bearing": 32.725788116455078,
+      "accuracy": 7.9461684179711867,
+      "vantagePoint": "Mission/Bernal area"
+    },
+    {
+      "lat": 37.816668362796541,
+      "lng": -122.3721830758699,
+      "bearing": 210.33181762695312,
+      "accuracy": 6.2104690792663932,
+      "vantagePoint": "Treasure Island (reading 2)"
+    }
+  ]
+}

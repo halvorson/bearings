@@ -1,0 +1,66 @@
+{
+  "name": "S Tower GGB",
+  "knownLocation": {
+    "lat": 37.814059454854515,
+    "lng": -122.47788705223233,
+    "source": "Google Maps satellite imagery",
+    "description": "South tower (San Francisco side) of the Golden Gate Bridge"
+  },
+  "notes": "7 observations from diverse vantage points with wide angular spread. Battery Spencer reading (bearing 101.28) shows +26° error — suspected magnetic interference from bridge anchorage infrastructure.",
+  "dataPoints": [
+    {
+      "id": "2ZYWS825g1LzYrFKXNvl",
+      "lat": 37.8070059175949,
+      "lng": -122.47245773818342,
+      "bearing": 315.41265869140625,
+      "accuracy": 4.748651530191762,
+      "vantagePoint": "Hawk Hill area"
+    },
+    {
+      "id": "R9Qq9fbCQwMvOQVp8luK",
+      "lat": 37.826978809244316,
+      "lng": -122.49917590935753,
+      "bearing": 101.28266906738281,
+      "accuracy": 6.16133448169341,
+      "vantagePoint": "Battery Spencer area (suspected magnetic interference)"
+    },
+    {
+      "id": "XrAKaQyDjaFKwY469rMW",
+      "lat": 37.80625283705569,
+      "lng": -122.45493258839372,
+      "bearing": 285.409423828125,
+      "accuracy": 4.443235172697603,
+      "vantagePoint": "Lands End trail area"
+    },
+    {
+      "id": "yuPD2cmWNhmrhnr2nFsJ",
+      "lat": 37.80041265989814,
+      "lng": -122.47824105785354,
+      "bearing": 8.905256271362305,
+      "accuracy": 3.1133771787241575,
+      "vantagePoint": "Baker Beach area"
+    },
+    {
+      "id": "zrG6pdzf9cz968G3GIJn",
+      "lat": 37.824107437339514,
+      "lng": -122.52738450926171,
+      "bearing": 96.66275024414062,
+      "accuracy": 4.748651530191761,
+      "vantagePoint": "Coastal Trail area"
+    },
+    {
+      "lat": 37.829856837722026,
+      "lng": -122.48328792494281,
+      "bearing": 153.46546936035156,
+      "accuracy": 5.5118072550260839,
+      "vantagePoint": "Marin Headlands (added 2026-04)"
+    },
+    {
+      "lat": 37.805461545179519,
+      "lng": -122.4302154604831,
+      "bearing": 272.28326416015625,
+      "accuracy": 6.56816943908373,
+      "vantagePoint": "Presidio/Crissy Field area (added 2026-04)"
+    }
+  ]
+}
