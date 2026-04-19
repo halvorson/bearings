@@ -32,6 +32,15 @@ const SELFCAL_RANGE_MIN = -5;
 const SELFCAL_RANGE_MAX = 25;
 const SELFCAL_STEP = 0.5;
 
+// Error ellipse — nσ covariance ellipse around the triangulation estimate.
+// 2σ ≈ 95%. Change here to re-tune (1 = ~68%, 2 = ~95%, 3 = ~99.7%).
+const ERROR_ELLIPSE_SIGMA = 2;
+const ERROR_ELLIPSE_POINTS = 64;
+// Floor + cap (meters) so tiny-residual cases don't vanish and pathological
+// cases don't blow up the map. Applied to each semi-axis.
+const ERROR_ELLIPSE_MIN_AXIS_M = 15;
+const ERROR_ELLIPSE_MAX_AXIS_M = 5000;
+
 // ---------------------------------------------------------------------------
 // Helper: degrees ↔ radians
 // ---------------------------------------------------------------------------
@@ -367,6 +376,97 @@ function convexHull(points) {
 }
 
 /**
+ * Build an error ellipse polygon from the residual covariance of the
+ * weighted least-squares ray intersection.
+ *
+ * Model: each observation's perpendicular distance residual pd_i is a linear
+ * function of the estimate position with Jacobian n_i (unit vector
+ * perpendicular to the ray direction). The weighted normal matrix is
+ *   N = Σ w_i n_i n_i^T
+ * and the variance of the fit is
+ *   s² = Σ w_i pd_i² / (n − 2)
+ * giving covariance Σ = s² N⁻¹. Eigenvalues of Σ give the squared semi-axis
+ * lengths of the 1σ ellipse; we scale by ERROR_ELLIPSE_SIGMA.
+ *
+ * Returns a GeoJSON Polygon, or null if the geometry is degenerate.
+ */
+function buildErrorEllipse(points2d, directions, estimated, weights, lat0, lng0, lat0Rad) {
+  const n = points2d.length;
+  if (n < 3) return null;
+
+  // Accumulate N (2×2) and the weighted sum of squared perpendicular residuals.
+  let n00 = 0, n01 = 0, n11 = 0;
+  let ssr = 0;
+  let effectiveCount = 0;
+  for (let i = 0; i < n; i++) {
+    const w = weights[i];
+    if (w <= 0) continue;
+    const { x: dx, y: dy } = directions[i];
+    // Unit perpendicular to ray direction (2D).
+    const nx = dy;
+    const ny = -dx;
+    const vx = estimated.x - points2d[i].x;
+    const vy = estimated.y - points2d[i].y;
+    const pd = vx * nx + vy * ny; // signed perpendicular distance (meters)
+
+    n00 += w * nx * nx;
+    n01 += w * nx * ny;
+    n11 += w * ny * ny;
+    ssr += w * pd * pd;
+    effectiveCount++;
+  }
+
+  const dof = Math.max(effectiveCount - 2, 1);
+  const s2 = ssr / dof;
+  if (!Number.isFinite(s2) || s2 < 0) return null;
+
+  // Invert N. For a symmetric 2×2: det = n00*n11 - n01²
+  const det = n00 * n11 - n01 * n01;
+  if (!Number.isFinite(det) || Math.abs(det) < 1e-12) return null;
+  const inv00 = n11 / det;
+  const inv01 = -n01 / det;
+  const inv11 = n00 / det;
+
+  // Σ = s² · N⁻¹
+  const c00 = s2 * inv00;
+  const c01 = s2 * inv01;
+  const c11 = s2 * inv11;
+
+  // Eigenvalues of the 2×2 symmetric covariance.
+  const tr = c00 + c11;
+  const discr = Math.sqrt(Math.max(0, ((c00 - c11) / 2) ** 2 + c01 * c01));
+  const lambda1 = tr / 2 + discr; // larger
+  const lambda2 = tr / 2 - discr;
+  if (lambda1 <= 0) return null;
+
+  // Orientation of semi-major axis (radians, math convention — CCW from +x).
+  const orientationRad = 0.5 * Math.atan2(2 * c01, c00 - c11);
+
+  // Semi-axis lengths in meters, scaled by nσ, clamped to sensible bounds.
+  const rawMajor = ERROR_ELLIPSE_SIGMA * Math.sqrt(lambda1);
+  const rawMinor = ERROR_ELLIPSE_SIGMA * Math.sqrt(Math.max(lambda2, 0));
+  const aMeters = Math.min(Math.max(rawMajor, ERROR_ELLIPSE_MIN_AXIS_M), ERROR_ELLIPSE_MAX_AXIS_M);
+  const bMeters = Math.min(Math.max(rawMinor, ERROR_ELLIPSE_MIN_AXIS_M), ERROR_ELLIPSE_MAX_AXIS_M);
+
+  // Parametric ellipse in LTP, then project back to lat/lng.
+  const cosO = Math.cos(orientationRad);
+  const sinO = Math.sin(orientationRad);
+  const ring = [];
+  for (let i = 0; i <= ERROR_ELLIPSE_POINTS; i++) {
+    const t = (i / ERROR_ELLIPSE_POINTS) * 2 * Math.PI;
+    const ex = aMeters * Math.cos(t);
+    const ey = bMeters * Math.sin(t);
+    // Rotate
+    const rx = ex * cosO - ey * sinO;
+    const ry = ex * sinO + ey * cosO;
+    const { lat, lng } = ltpToLatLng(estimated.x + rx, estimated.y + ry, lat0, lng0, lat0Rad);
+    ring.push([lng, lat]);
+  }
+
+  return { type: 'Polygon', coordinates: [ring] };
+}
+
+/**
  * Build the confidence polygon.
  *
  * For each of the N data points (that weren't heavily downweighted),
@@ -491,8 +591,18 @@ function computeTriangulation(points) {
     return { dataPointCount: n, insufficientSpread: true, lowConfidence: false };
   }
 
-  // --- Step 5: Confidence polygon (uses calibrated bearings, excludes outliers) ---
-  const confidencePolygon = buildConfidencePolygon(points2d, calibratedBearings, lat0, lng0, lat0Rad, finalWeights);
+  // --- Step 5: Confidence region ---
+  // For n >= 3, build a residual-covariance error ellipse (nσ). Tighter and
+  // more honest than the ±5° wedge hull once the fit has real constraints.
+  // For n = 2, fall back to the wedge-hull polygon (covariance is ill-defined
+  // with only 2 observations).
+  let confidencePolygon = null;
+  if (n >= 3) {
+    confidencePolygon = buildErrorEllipse(points2d, directions, estimated, finalWeights, lat0, lng0, lat0Rad);
+  }
+  if (!confidencePolygon) {
+    confidencePolygon = buildConfidencePolygon(points2d, calibratedBearings, lat0, lng0, lat0Rad, finalWeights);
+  }
 
   // --- Convert estimated point back to lat/lng ---
   const { lat: estimatedLat, lng: estimatedLng } = ltpToLatLng(

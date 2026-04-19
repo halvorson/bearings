@@ -135,14 +135,15 @@ function addSourcesAndLayers(map) {
     },
   });
 
-  // confidence-polygon fill
+  // confidence-polygon fill (now rendered as a residual-covariance error
+  // ellipse from the Cloud Function for n >= 3; wedge-hull fallback for n = 2)
   map.addLayer({
     id: 'confidence-polygon',
     type: 'fill',
     source: 'confidence-polygon',
     paint: {
       'fill-color': '#EF4444',
-      'fill-opacity': 0.2,
+      'fill-opacity': 0.08,
     },
   });
 
@@ -153,8 +154,8 @@ function addSourcesAndLayers(map) {
     source: 'confidence-polygon',
     paint: {
       'line-color': '#EF4444',
-      'line-width': 2,
-      'line-opacity': 0.6,
+      'line-width': 1.5,
+      'line-opacity': 0.4,
       'line-dasharray': [4, 2],
     },
   });
