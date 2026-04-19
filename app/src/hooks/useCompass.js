@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useSyncExternalStore } from 'react';
+import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
+import geomagnetism from 'geomagnetism';
 
 // ── Shared permission state across all useCompass instances ──────────────
 // DeviceOrientationEvent.requestPermission() is page-level — once granted,
@@ -20,7 +21,40 @@ function setSharedPermissionState(state) {
   _listeners.forEach((cb) => cb());
 }
 
-export function useCompass() {
+// ── Declination cache ────────────────────────────────────────────────────
+// Declination varies <0.03° across ~10km, so we recompute only when the
+// position moves more than DECL_RECOMPUTE_KM. This keeps us well inside
+// the ±0.35° WMM uncertainty and avoids calling geomagnetism on every
+// orientation event.
+const DECL_RECOMPUTE_KM = 5;
+let _cachedDecl = null; // { lat, lng, decl }
+
+function computeDeclination(lat, lng) {
+  if (
+    _cachedDecl &&
+    Math.abs(_cachedDecl.lat - lat) < DECL_RECOMPUTE_KM / 111 &&
+    Math.abs(_cachedDecl.lng - lng) < DECL_RECOMPUTE_KM / 111
+  ) {
+    return _cachedDecl.decl;
+  }
+  try {
+    const info = geomagnetism.model().point([lat, lng]);
+    _cachedDecl = { lat, lng, decl: info.decl };
+    return info.decl;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * useCompass — returns a true-north bearing with magnetic declination correction.
+ *
+ * @param {{ lat?: number, lng?: number }} position — optional GPS position used
+ *   to compute declination via the WMM-2025 model. When absent, the reading is
+ *   returned uncorrected (magnetic north on iOS, platform-dependent on Android).
+ */
+export function useCompass(position = {}) {
+  const { lat, lng } = position;
   const [bearing, setBearing] = useState(null);
   const [calibrationQuality, setCalibrationQuality] = useState('unknown');
 
@@ -41,26 +75,40 @@ export function useCompass() {
     }
   }, [requiresPermission]);
 
+  // Keep the latest declination in a ref so the orientation handler doesn't
+  // need to re-subscribe every time position updates.
+  const declinationRef = useRef(0);
+  useEffect(() => {
+    if (typeof lat === 'number' && typeof lng === 'number') {
+      declinationRef.current = computeDeclination(lat, lng);
+    }
+  }, [lat, lng]);
+
   const handleOrientation = useCallback((event) => {
     // ── Bearing ──────────────────────────────────────────────────────────
     let newBearing = null;
+    let isMagnetic = false;
 
     if (event.webkitCompassHeading != null) {
-      // iOS: already degrees clockwise from magnetic north
+      // iOS: degrees clockwise from *magnetic* north — apply declination
       newBearing = event.webkitCompassHeading;
+      isMagnetic = true;
     } else if (event.alpha != null) {
-      // Android: alpha is degrees counter-clockwise from north (when absolute)
+      // Android `deviceorientationabsolute` is specified relative to Earth's
+      // coordinate frame (true north). `deviceorientation` alpha without
+      // absolute=true is device-relative and unreliable — treat as magnetic
+      // so self-cal still compensates, but do not double-correct absolute.
       newBearing = 360 - event.alpha;
+      isMagnetic = !event.absolute;
     }
 
     if (newBearing !== null) {
-      // Normalise to [0, 360)
+      if (isMagnetic) newBearing += declinationRef.current;
       setBearing(((newBearing % 360) + 360) % 360);
     }
 
     // ── Calibration quality ──────────────────────────────────────────────
     if (event.webkitCompassHeading != null) {
-      // iOS: webkitCompassAccuracy gives accuracy in degrees
       const accuracy = event.webkitCompassAccuracy;
       if (accuracy != null && accuracy >= 0) {
         setCalibrationQuality(accuracy > 15 ? 'poor' : 'good');
@@ -68,7 +116,6 @@ export function useCompass() {
         setCalibrationQuality('unknown');
       }
     } else if (event.alpha != null) {
-      // Android: absolute events are reliable, non-absolute are poor
       setCalibrationQuality(event.absolute ? 'good' : 'poor');
     }
   }, []);
@@ -78,15 +125,11 @@ export function useCompass() {
     if (!supported) return;
     if (requiresPermission && permissionState !== 'granted') return;
 
-    // Android Chrome fires absolute compass data on 'deviceorientationabsolute'.
-    // Fall back to 'deviceorientation' for iOS and browsers without it.
     const hasAbsoluteEvent = 'ondeviceorientationabsolute' in window;
 
     if (hasAbsoluteEvent) {
       window.addEventListener('deviceorientationabsolute', handleOrientation, true);
     }
-    // Always attach the standard event too — iOS uses it exclusively,
-    // and Android will use it as a fallback if absolute isn't available.
     window.addEventListener('deviceorientation', handleOrientation, true);
 
     return () => {

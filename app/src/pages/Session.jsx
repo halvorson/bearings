@@ -35,8 +35,8 @@ export default function Session({ id }) {
 
   const activeItem = items.find((i) => i.id === activeItemId) ?? null;
   const previewMode = useSessionStore((s) => s.previewMode);
-  const { bearing, supported: compassSupported, calibrationQuality, permissionState } = useCompass();
   const { lat: gpsLat, lng: gpsLng, accuracy, error: gpsError } = useGeolocation();
+  const { bearing, supported: compassSupported, calibrationQuality, permissionState } = useCompass({ lat: gpsLat, lng: gpsLng });
 
   // Fire session_joined once when session loads
   useEffect(() => {

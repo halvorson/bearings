@@ -23,8 +23,8 @@ export default function TrackButton({ sessionId }) {
   const startPreview = useSessionStore((s) => s.startPreview);
   const stopPreview = useSessionStore((s) => s.stopPreview);
 
-  const { bearing, supported: compassSupported, permissionState, requestPermission } = useCompass();
   const { lat, lng, accuracy } = useGeolocation();
+  const { bearing, supported: compassSupported, permissionState, requestPermission } = useCompass({ lat, lng });
   const { items } = useItems(sessionId);
   const { dataPoints } = useDataPoints(sessionId, activeItemId);
 
