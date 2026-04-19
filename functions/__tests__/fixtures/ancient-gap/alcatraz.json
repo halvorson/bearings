@@ -1,0 +1,40 @@
+{
+  "name": "Alcatraz",
+  "knownLocation": {
+    "lat": 37.82711069461153,
+    "lng": -122.42301697676008,
+    "source": "Google Maps",
+    "description": "Alcatraz Island, San Francisco Bay"
+  },
+  "notes": "4 observations from SF peninsula and Treasure Island. Added 2026-04 for expanded triangulation test corpus.",
+  "dataPoints": [
+    {
+      "lat": 37.829860729706731,
+      "lng": -122.4832906365242,
+      "bearing": 79.2196273803711,
+      "accuracy": 4.8866143948658127,
+      "vantagePoint": "Marin Headlands"
+    },
+    {
+      "lat": 37.792098394975184,
+      "lng": -122.45847804496017,
+      "bearing": 26.880962371826172,
+      "accuracy": 7.2087860636392449,
+      "vantagePoint": "Pacific Heights area"
+    },
+    {
+      "lat": 37.805476286295765,
+      "lng": -122.4302144199369,
+      "bearing": 5.7052350044250488,
+      "accuracy": 4.7486515301917613,
+      "vantagePoint": "Presidio/Crissy Field area"
+    },
+    {
+      "lat": 37.816672388582205,
+      "lng": -122.37218120308765,
+      "bearing": 277.85870361328125,
+      "accuracy": 7.6645236425347774,
+      "vantagePoint": "Treasure Island"
+    }
+  ]
+}

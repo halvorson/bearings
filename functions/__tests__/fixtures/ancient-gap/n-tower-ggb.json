@@ -6,7 +6,7 @@
     "source": "Google Maps satellite imagery",
     "description": "North tower (Marin side) of the Golden Gate Bridge"
   },
-  "notes": "3 observations from different vantage points. Point index 2 (Hawk Hill, bearing 54.9) was taken near a metal railing and suspected of magnetic interference, though leave-one-out analysis shows all three readings have significant error. Algorithm flags this as lowConfidence (estimate >2km from observer centroid).",
+  "notes": "5 observations from different vantage points. Battery Spencer reading near metal railing (bearing 54.9) shows +40° error — strong magnetic interference. IRLS downweights it.",
   "dataPoints": [
     {
       "id": "1j9oFnJpLTKkCYajrXqh",
@@ -14,8 +14,6 @@
       "lng": -122.47246218868105,
       "bearing": 331.8048095703125,
       "accuracy": 4.748651530191761,
-      "participantToken": "76c8c492-88f1-49ea-90e3-6d566e0273f4",
-      "timestamp": "2026-03-17T01:41:51.460Z",
       "vantagePoint": "Hawk Hill overlook area"
     },
     {
@@ -24,8 +22,6 @@
       "lng": -122.47823770796029,
       "bearing": 6.9012274742126465,
       "accuracy": 4.748651530191761,
-      "participantToken": "76c8c492-88f1-49ea-90e3-6d566e0273f4",
-      "timestamp": "2026-03-16T00:37:05.023Z",
       "vantagePoint": "Baker Beach area"
     },
     {
@@ -34,9 +30,21 @@
       "lng": -122.49917055980461,
       "bearing": 54.9205322265625,
       "accuracy": 4.210217522099167,
-      "participantToken": "76c8c492-88f1-49ea-90e3-6d566e0273f4",
-      "timestamp": "2026-03-15T23:45:50.982Z",
-      "vantagePoint": "Battery Spencer area (near metal railing — suspected magnetic interference)"
+      "vantagePoint": "Battery Spencer area (near metal railing — magnetic interference)"
+    },
+    {
+      "lat": 37.829855308826446,
+      "lng": -122.48329337601332,
+      "bearing": 132.2901611328125,
+      "accuracy": 5.9565323734662909,
+      "vantagePoint": "Marin Headlands (added 2026-04)"
+    },
+    {
+      "lat": 37.805462601189589,
+      "lng": -122.43021774007404,
+      "bearing": 287.97674560546875,
+      "accuracy": 4.9666847898319526,
+      "vantagePoint": "Presidio/Crissy Field area (added 2026-04)"
     }
   ]
 }

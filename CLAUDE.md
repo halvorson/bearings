@@ -64,6 +64,9 @@ Use dedicated tools (Read, Edit, Write, Glob, Grep) instead of shell equivalents
 
 Do not add commands to the allowlist for one-off tasks — accept the permission prompt instead. Only add commands that are needed repeatedly across sessions.
 
+## Pending Work
+- **#17 Triangulation v2:** Self-calibrating angular IRLS + client-side declination correction. Full spec in `docs/Triangulation_TDD_v2.md`, implementation prompt in `docs/prompts/implement-triangulation-v2.md`. To execute: `cat docs/prompts/implement-triangulation-v2.md | claude`
+
 ## Development Workflow
 - Opus coordinates, Sonnet writes code, Haiku does reviews and lightweight tasks
 - TODO tracker in `docs/TODO.md` with tiered workflow (small/medium/large)

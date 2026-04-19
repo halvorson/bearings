@@ -33,6 +33,8 @@
 | 15 | open   | large  | Live bearing preview — show user location + real-time directional vector on map before saving (see spec below) |
 | 16 | open   | medium | Directional guidance — when in "start bearing" mode, show which way to turn to face the selected item (see spec below) |
 | 17 | open   | large  | Triangulation accuracy overhaul — pull "Ancient Gap" field data as test fixtures, improve intersection algorithm for outlier robustness (see spec below) |
+| 18 | open   | small  | Ship client-side declination correction — fix already in working tree (useCompass.js), just needs commit + deploy (see spec below) |
+| 19 | open   | medium | Confidence polygon is too large visually — rethink display of triangulation uncertainty (see spec below) |
 
 ---
 
@@ -345,3 +347,89 @@ With test fixtures and baselines in place, explore algorithm improvements:
 - **Test runner:** Vitest (`cd functions && npx vitest`)
 - **The Cloud Function** (`onDataPointWritten`) calls `computeTriangulation` on every data point write — algorithm changes propagate automatically
 - Step 1 (fixture extraction) needs `firebase` CLI access to `bearings-app-prod` Firestore
+
+---
+
+## #18 — Ship client-side declination correction
+
+**Version:** v0.3.1 (patch)
+**Tier:** small — the fix already exists as uncommitted changes in the working tree
+**Depends on:** None
+
+**Problem:**
+Stored bearings on dev are ~10–13° west of reality in the SF Bay Area, confirmed against known S Tower GGB readings from Marin Headlands and Presidio (off by −12.5° and −10.6° respectively). Expected magnetic declination in SF is +12.88° E. Root cause: v0.3.0 (currently deployed) does not apply any magnetic→true-north correction; it stores `webkitCompassHeading` verbatim.
+
+**Evidence the fix is already written (uncommitted):**
+- `app/src/hooks/useCompass.js` adds `geomagnetism` import, `computeDeclination(lat, lng)` with a 5km cache, a `declinationRef`, and `if (isMagnetic) newBearing += declinationRef.current;`
+- `app/package.json` already bumped to `0.3.1` with `geomagnetism` dep
+- `CaptureOverlay.jsx`, `TrackButton.jsx`, `Session.jsx` all pass `{ lat, lng }` into `useCompass(...)`
+- `app/node_modules/geomagnetism` is installed
+- Deployed bundle at `bearings-app-dev.web.app` confirmed to contain NO declination logic
+
+**Plan:**
+1. **Writer (Sonnet):** commit working-tree changes with a focused message (subject: `v0.3.1: client-side magnetic declination correction`). Only stage `app/src/hooks/useCompass.js`, `app/src/components/CaptureOverlay.jsx`, `app/src/components/TrackButton.jsx`, `app/src/pages/Session.jsx`, `app/package.json`, `app/package-lock.json`. Leave the triangulate.js / fixtures / docs changes out of this commit — they belong with #17.
+2. **Reviewer (Haiku):** spot-check the commit for:
+   - Sign convention: `geomagnetism` returns positive-East declination; `TrueBearing = MagneticBearing + decl` is correct
+   - `isMagnetic` guarding: Android `deviceorientationabsolute` with `event.absolute === true` must NOT get declination added (already handled by `isMagnetic = !event.absolute`)
+   - No double-correction: no caller adds declination again
+   - `declinationRef` updates via `useEffect([lat, lng])`, orientation handler reads the ref (so no stale closure)
+3. **Build + deploy:** `cd app && npm run build && cd .. && firebase deploy --only hosting --project dev`
+4. **Smoke test (user):** re-record a bearing from a known vantage point toward S Tower GGB; confirm ray now lands on the tower.
+5. **Migration note:** existing stored data points on prod and dev still have uncorrected magnetic bearings. Don't back-fill — the self-cal step in `computeTriangulation` (n≥3) already absorbs a global bearing bias, so mixed-vintage sessions with ≥3 points will re-triangulate correctly. Document this in the commit.
+
+---
+
+## #19 — Rethink confidence polygon display
+
+**Version:** v0.3.2 (or later; independent of #18)
+**Tier:** medium — visualization + light algorithm work, user-facing
+**Depends on:** None (but pairs well with #17)
+
+**Problem:**
+The red dashed confidence polygon on the map is now visually dominating — often much larger than the actual estimate uncertainty after the new IRLS + self-cal math tightens the point estimate. The current polygon is built from a fixed ±5° wedge on each saved bearing and the convex hull of all pairwise extreme-ray intersections (`functions/src/triangulate.js:377 buildConfidencePolygon`). That geometry is technically correct but pessimistic: at km-scale ray lengths, ±5° sweeps out hundreds of meters, regardless of how well the rays actually agree.
+
+**Goal:**
+Display an uncertainty region that reflects the *posterior* uncertainty of the triangulation (how well the rays agree) rather than a worst-case envelope of each single ray.
+
+**Candidate approaches (explore in this order):**
+1. **Residual-scaled sigma.** After IRLS, compute the weighted RMS residual of the bearings. Use that (plus GPS accuracy) to derive a covariance of the estimate via the linearized least-squares formula `Σ = (JᵀWJ)⁻¹ × σ²`. Draw a 1σ or 2σ ellipse around the estimate. This is the standard triangulation uncertainty ellipse and will collapse nicely as rays agree.
+2. **Downrange-scaled wedge.** Replace the fixed ±5° with a wedge whose half-angle scales with residuals (e.g., `max(1°, 2× RMS residual)`), and clip it at reasonable ray lengths.
+3. **Just drop the polygon entirely when residuals are tight.** If RMS residual < threshold, show only the point + a small error circle; show the polygon only for genuinely ambiguous cases.
+
+**Implementation Plan**
+
+#### Step 1 — Instrument + baseline
+**Writer:** Sonnet in a worktree
+**Reviewer:** Opus
+
+1. In `functions/src/triangulate.js`, compute and expose the weighted RMS residual and covariance Σ as part of the result (don't change the polygon yet).
+2. Add a field test: for each Ancient Gap fixture, log RMS residual, covariance 1σ/2σ axis lengths, and the current polygon area. This gives us a baseline for tuning.
+
+#### Step 2 — Error ellipse rendering
+**Writer:** Sonnet in a worktree
+**Reviewer:** Opus (polygon/Mapbox layer work is the kind of thing where visual regressions hide; Opus should skim the diff)
+
+1. Return `errorEllipse: { semiMajor, semiMinor, orientation, centerLat, centerLng }` from the Cloud Function (kept in Firestore as a plain object, not nested arrays — follow the existing `JSON.stringify(confidencePolygon)` convention if needed).
+2. In `MapView.jsx`, replace the `confidence-polygon` source with an ellipse GeoJSON built from the same `destinationPoint` helper already in the file (sweep 64 points, scale by semi-major/minor).
+3. Keep the existing polygon only as a fallback for n=2 (where covariance is ill-defined).
+4. Soften the fill: `fill-opacity: 0.1`, outline `line-width: 1.5`, `line-opacity: 0.4`. The visual should whisper, not shout.
+
+#### Step 3 — Tune and ship
+**Writer:** Sonnet
+**Reviewer:** Haiku (final visual pass)
+
+1. Tune the sigma multiplier (1σ vs 2σ) using the Ancient Gap fixtures as ground truth: the ellipse should contain the true location ~68% or ~95% of the time across items.
+2. Add a fixture test asserting the ellipse contains `knownLocation` for each Ancient Gap item.
+3. Deploy to dev, smoke test with existing sessions.
+
+**Docs updates required:**
+- TDD: document the covariance computation and ellipse convention
+- PRD: brief update replacing "confidence polygon" with "error ellipse"
+
+### Agent summary
+
+| Step | Writer | Reviewer |
+|------|--------|----------|
+| 1 — Instrument residuals + covariance | Sonnet (worktree) | Opus |
+| 2 — Ellipse rendering (functions + MapView) | Sonnet (worktree) | Opus |
+| 3 — Tune + test + deploy | Sonnet | Haiku |

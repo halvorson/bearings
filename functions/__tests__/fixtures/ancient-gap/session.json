@@ -2,23 +2,32 @@
   "sessionId": "fruDQ9CF",
   "name": "Ancient Gap",
   "source": "bearings-app-dev Firestore",
-  "collectedDate": "2026-03-15 to 2026-03-17",
+  "collectedDate": "2026-03-15 to 2026-04-18",
   "collector": "Michael Halvorson",
-  "location": "San Francisco Bay Area — Marin Headlands, Baker Beach, Lands End",
+  "location": "San Francisco Bay Area — Marin Headlands, Baker Beach, Lands End, Treasure Island",
   "items": [
-    { "file": "n-tower-ggb.json", "name": "N Tower GGB", "points": 3 },
-    { "file": "s-tower-ggb.json", "name": "S Tower GGB", "points": 5 },
-    { "file": "sutro-tower.json", "name": "Sutro Tower", "points": 2 },
-    { "file": "pt-bonita-lighthouse.json", "name": "Pt Bonita Lighthouse", "points": 3 }
+    { "file": "n-tower-ggb.json", "name": "N Tower GGB", "points": 5 },
+    { "file": "s-tower-ggb.json", "name": "S Tower GGB", "points": 7 },
+    { "file": "sutro-tower.json", "name": "Sutro Tower", "points": 5 },
+    { "file": "pt-bonita-lighthouse.json", "name": "Pt Bonita Lighthouse", "points": 3 },
+    { "file": "alcatraz.json", "name": "Alcatraz", "points": 4 },
+    { "file": "salesforce-tower.json", "name": "Salesforce Tower", "points": 4 }
   ],
   "baselineResults": {
-    "algorithm": "least-squares ray intersection (v0.2)",
-    "date": "2026-03-25",
-    "results": {
-      "N Tower GGB": { "error_m": 744, "lowConfidence": true, "insufficientSpread": false },
-      "S Tower GGB": { "error_m": 356, "lowConfidence": false, "insufficientSpread": false },
-      "Sutro Tower": { "error_m": null, "lowConfidence": false, "insufficientSpread": true },
-      "Pt Bonita Lighthouse": { "error_m": 761, "lowConfidence": false, "insufficientSpread": false }
+    "algorithm": "self-calibrating angular IRLS (v3)",
+    "date": "2026-04-18",
+    "crossValidated": {
+      "median_m": 371,
+      "mean_m": 389,
+      "max_m": 808
+    },
+    "fullDataset": {
+      "N Tower GGB": { "error_m": 176 },
+      "S Tower GGB": { "error_m": 328 },
+      "Sutro Tower": { "error_m": 73 },
+      "Pt Bonita Lighthouse": { "error_m": 808 },
+      "Alcatraz": { "error_m": 341 },
+      "Salesforce Tower": { "error_m": 563 }
     }
   }
 }

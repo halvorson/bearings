@@ -1,20 +1,22 @@
 /**
- * Bearings — Triangulation Math Module
+ * Bearings — Triangulation Math Module (v3 — self-calibrating angular IRLS)
  *
  * computeTriangulation(points) — takes an array of data point objects with
  * fields: lat, lng, bearing (degrees, 0–360 clockwise from north), accuracy.
  *
- * Algorithm (v2 — IRLS):
+ * Algorithm:
  *   Step 1  — Insufficient spread check (early exit if range < 10°)
  *   Step 2  — Convert observer positions to local tangent plane (LTP)
- *   Step 3  — Convert bearings to unit direction vectors
- *   Step 4  — Iterative Reweighted Least Squares (IRLS):
+ *   Step 3  — Self-calibrating bias estimation (n >= 3):
+ *             sweep [-5°, +25°] @ 0.5° step, pick bias minimising total
+ *             squared perpendicular residual of the unweighted LS estimate
+ *   Step 4  — IRLS with angular residuals (n > 3 only):
  *             a. Initial weights from GPS accuracy
  *             b. Weighted least-squares ray intersection
- *             c. Compute per-ray residuals
- *             d. Huber reweighting (downweight outliers)
+ *             c. Angular residual (deg) between observer→estimate and ray
+ *             d. Huber reweight with 10° threshold
  *             e. Repeat until convergence or max iterations
- *   Step 5  — Confidence polygon via ±5° extreme rays + convex hull
+ *   Step 5  — Confidence polygon via ±5° extreme rays (calibrated bearings)
  *   Step 6  — Low-confidence flag if estimate is > 2 km from observer centroid
  */
 
@@ -24,7 +26,11 @@ const LOW_CONFIDENCE_DIST_M = 2000;
 const BEARING_OFFSET_DEG = 5;
 const IRLS_MAX_ITER = 10;
 const IRLS_CONVERGENCE_M = 0.1;
-const HUBER_THRESHOLD_M = 50; // perpendicular residual beyond which downweighting begins
+const HUBER_THRESHOLD_DEG = 10; // angular residual beyond which downweighting begins
+const SELFCAL_MIN_POINTS = 3;
+const SELFCAL_RANGE_MIN = -5;
+const SELFCAL_RANGE_MAX = 25;
+const SELFCAL_STEP = 0.5;
 
 // ---------------------------------------------------------------------------
 // Helper: degrees ↔ radians
@@ -183,12 +189,61 @@ function perpendicularDistance(P, origin, direction) {
 }
 
 /**
+ * Angular residual (degrees) between the bearing ray and the direction from
+ * observer to the current estimate. Scale-independent: a 5° compass error
+ * yields the same residual whether the target is 1 km or 10 km away.
+ */
+function angularResidual(estimate, origin, direction) {
+  const vx = estimate.x - origin.x;
+  const vy = estimate.y - origin.y;
+  const dist = Math.sqrt(vx * vx + vy * vy);
+  if (dist < 1) return 0;
+  const cosA = (vx * direction.x + vy * direction.y) / dist;
+  const clamped = Math.max(-1, Math.min(1, cosA));
+  return toDeg(Math.acos(clamped));
+}
+
+/**
  * Huber weighting function.
  * Returns 1.0 for residuals within threshold, k/|r| for larger residuals.
  */
 function huberWeight(residual, k) {
   if (residual <= k) return 1.0;
   return k / residual;
+}
+
+/**
+ * Self-calibrating bearing bias estimation.
+ *
+ * Sweep a bearing offset across [SELFCAL_RANGE_MIN, SELFCAL_RANGE_MAX]
+ * at SELFCAL_STEP increments, finding the offset that minimises the sum
+ * of squared perpendicular residuals of the unweighted LS intersection.
+ *
+ * Implicitly handles magnetic declination plus per-device compass bias.
+ * Returns the best bias in degrees (0 if no valid intersection).
+ */
+function estimateBearingBias(origins, bearings) {
+  let bestBias = 0;
+  let bestResidual = Infinity;
+
+  for (let bias = SELFCAL_RANGE_MIN; bias <= SELFCAL_RANGE_MAX + 1e-9; bias += SELFCAL_STEP) {
+    const dirs = bearings.map((b) => bearingToDirection(b + bias));
+    const weights = origins.map(() => 1);
+    const est = weightedLeastSquaresIntersection(origins, dirs, weights);
+    if (est === null) continue;
+
+    let total = 0;
+    for (let i = 0; i < origins.length; i++) {
+      const r = perpendicularDistance(est, origins[i], dirs[i]);
+      total += r * r;
+    }
+    if (total < bestResidual) {
+      bestResidual = total;
+      bestBias = bias;
+    }
+  }
+
+  return bestBias;
 }
 
 /**
@@ -213,11 +268,11 @@ function irlsIntersection(origins, directions, accuracies) {
   if (n <= 3) return { estimated, finalWeights: weights };
 
   for (let iter = 0; iter < IRLS_MAX_ITER; iter++) {
-    // Compute residuals and reweight
+    // Compute angular residuals and reweight
     for (let i = 0; i < n; i++) {
-      const r = perpendicularDistance(estimated, origins[i], directions[i]);
+      const r = angularResidual(estimated, origins[i], directions[i]);
       const priorWeight = 1 / Math.max(accuracies[i] ?? 1, 1);
-      weights[i] = priorWeight * huberWeight(r, HUBER_THRESHOLD_M);
+      weights[i] = priorWeight * huberWeight(r, HUBER_THRESHOLD_DEG);
     }
 
     const newEstimated = weightedLeastSquaresIntersection(origins, directions, weights);
@@ -417,19 +472,27 @@ function computeTriangulation(points) {
   // --- Step 1: Project observers to LTP ---
   const { points2d, lat0, lng0, lat0Rad } = projectToLTP(points);
 
-  // --- Step 2: Bearing to direction vectors ---
-  const directions = bearings.map(bearingToDirection);
+  // --- Step 2: Self-calibrating bearing bias (n >= 3) ---
+  // Implicitly handles residual magnetic declination + per-device compass bias.
+  let calibratedBearings = bearings;
+  if (n >= SELFCAL_MIN_POINTS) {
+    const bias = estimateBearingBias(points2d, bearings);
+    calibratedBearings = bearings.map((b) => ((b + bias) % 360 + 360) % 360);
+  }
+
+  // --- Step 3: Bearing to direction vectors ---
+  const directions = calibratedBearings.map(bearingToDirection);
   const accuracies = points.map((p) => p.accuracy);
 
-  // --- Step 3: IRLS intersection ---
+  // --- Step 4: IRLS intersection (angular residuals) ---
   const { estimated, finalWeights } = irlsIntersection(points2d, directions, accuracies);
   if (estimated === null) {
     // Degenerate — treat as insufficient spread
     return { dataPointCount: n, insufficientSpread: true, lowConfidence: false };
   }
 
-  // --- Step 4: Confidence polygon (excludes heavily downweighted points) ---
-  const confidencePolygon = buildConfidencePolygon(points2d, bearings, lat0, lng0, lat0Rad, finalWeights);
+  // --- Step 5: Confidence polygon (uses calibrated bearings, excludes outliers) ---
+  const confidencePolygon = buildConfidencePolygon(points2d, calibratedBearings, lat0, lng0, lat0Rad, finalWeights);
 
   // --- Convert estimated point back to lat/lng ---
   const { lat: estimatedLat, lng: estimatedLng } = ltpToLatLng(
