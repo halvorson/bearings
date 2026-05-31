@@ -28,3 +28,4 @@
 | 10 | done   | small  | CTA button: "Mark" → "Record"                                                           |
 | 11 | done   | small  | Error polygon investigated — correct math, large shape due to similar bearings (4° + 27°) |
 | 12 | done   | small  | Bottom padding — replaced conflicting pb-6/pb-safe-b with max() inline style              |
+| 13 | done   | small  | OG preview image + app icon — redesigned favicon (dark/amber), PNG icons, og:image meta   |
